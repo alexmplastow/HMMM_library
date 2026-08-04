@@ -1,0 +1,536 @@
+import MDAnalysis as mda
+from MDAnalysis.analysis import align
+from MDAnalysis.analysis.rms import RMSF
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
+#Courtesy of chatGPT
+#* over a code block indicates the block was at least partially written by an NLP model
+from pathlib import Path
+import re
+
+#TODO: write a sanity check to ensure you are not botching positions for either lipids or
+	#TODO: proteins
+	#TODO: I may have accidentally delcared some variable as static in a method
+	#TODO: in a method, in a method
+
+#NOTE: this looks like a liability, r is not updating as needed
+	#NOTE: this will just hold my data in a structure which allows me
+	#NOTE: to pull usefull information later
+
+#*
+threeLetterAA2oneLetterAA = {
+    "ALA": "A",
+    "ARG": "R",
+    "ASN": "N",
+    "ASP": "D",
+    "CYS": "C",
+    "GLN": "Q",
+    "GLU": "E",
+    "GLY": "G",
+    "HIS": "H",
+    "ILE": "I",
+    "LEU": "L",
+    "LYS": "K",
+    "MET": "M",
+    "PHE": "F",
+    "PRO": "P",
+    "SER": "S",
+    "THR": "T",
+    "TRP": "W",
+    "TYR": "Y",
+    "VAL": "V",
+
+    # Common alternate/ambiguous codes seen in MD and PDB files
+    "ASX": "B",   # Aspartic acid or Asparagine (D/N)
+    "GLX": "Z",   # Glutamic acid or Glutamine (E/Q)
+    "XLE": "J",   # Leu or Ile
+    "SEC": "U",   # Selenocysteine
+    "PYL": "O",   # Pyrrolysine
+
+    # Sometimes present if protonation states are encoded:
+    "HSD": "H",
+    "HSE": "H",
+    "HSP": "H",
+}
+
+
+#TODO: adapt this code to accomodate both lipid and protein
+#NOTE: you have haphazardly declared each atom to have a residue
+	#NOTE: but describe a residue as clasically protein
+	#NOTE: so when you plug in an atom which corresponds to a lipid, your code
+	#NOTE: gets kinda kooky
+class atom:
+	def __init__(self, MDAatom):
+		self.MDAatom = MDAatom
+
+		if MDAatom.residue.resname in list(threeLetterAA2oneLetterAA.keys()):
+			
+			self.residue = residue(MDAatom.residue)
+
+		#Usefull features in case I find myself needing to map back to the
+			#Particular lipid
+		self.resname = MDAatom.resname
+		self.resID = MDAatom.resid
+		self.name = MDAatom.name
+
+	@property
+	def r(self):
+		return self.MDAatom.position
+
+
+
+#TODO: devise a contacts constructor
+#TODO: add get heavy atoms distances
+
+class residue:
+	def __init__(self, universeResidue):
+		self.universeResidue = universeResidue
+		self.resID = self.universeResidue.resid
+		self.resnum = self.universeResidue.resnum
+		#NOTE: self.aminoAcid is most certainly a string
+		self.aminoAcid = self.universeResidue.resname
+		self.aminoAcidLetter = threeLetterAA2oneLetterAA[self.aminoAcid]
+	@property
+	def r(self):
+		for atom in self.universeResidue.atoms:
+			if atom.name == "CA":
+				r = atom.position
+				break
+		return r
+
+	@property
+	def atoms(self):
+		return self.universeResidue.atoms
+
+	@property
+	def heavyAtoms(self):
+		heavyAtoms = [atom for atom in self.universeResidue.atoms if atom.name[0] != 'H']
+		return heavyAtoms
+		
+class protein:
+
+	def __init__(self, universe):
+		self.universe = universe
+
+	@property
+	def atoms(self):
+		return [atom(MDAatom) for MDAatom in self.universe.select_atoms("protein")]
+
+	#UPDATE this function to reflect the new class
+	@property
+	def residues(self):
+		universeResidues = self.universe.select_atoms("protein").residues
+		residues = [residue(universeResidue) 
+				for universeResidue 
+				in universeResidues]
+		return residues
+
+	
+	@property
+	def frameNum(self):
+		return self.universe.trajectory.frame
+
+	@property
+	def t_inNs(self):
+		return self.frameNum * 0.2
+
+	#NOTE: this will need an update now that we've moved to a custom
+		#NOTE: definition .center_of_mass() will fail
+	@property
+	def COM(self):
+		atoms = self.universe.select_atoms("protein")
+
+		#print("/////////////////////////////////////////")
+		#print("Number of protein atoms:", atoms.n_atoms)
+		#print("Total protein mass:", atoms.total_mass())
+		#print("Unique masses:", np.unique(atoms.masses))
+		#print("NaN coordinates:", np.isnan(atoms.positions).any())
+
+		#print("Sample names:", atoms.names[:20])
+		#print("Sample types:", atoms.types[:20])
+		#print("Sample elements:", atoms.elements[:20])
+		#print("/////////////////////////////////////////")
+
+		COM = atoms.center_of_mass()
+		return COM
+
+
+	@property
+	def geometricCenter(self):
+		atoms = self.universe.select_atoms("protein")
+		return atoms.center_of_geometry()
+
+
+	@property
+	def residuePositions(self):
+		R = np.zeros((0,3))
+		for residue in self.residues:
+			R = np.vstack((R, residue.r))
+		return R
+
+	@property
+	def maxZ(self):
+
+		R = self.residuePositions
+		
+		return max(R[:, 2])
+	
+	@property
+	def minZ(self):
+
+		R = self.residuePositions
+
+		return min(R[:, 2])
+
+
+	def getTrajectoryIndices(self):
+		return list(range(0, len(self.universe.trajectory)))
+
+	def goto(self, frameNum):
+		self.universe.trajectory[frameNum]
+
+	def getCOM_R_z(self):
+		
+		trajectoryIndices = self.getTrajectoryIndices()
+
+		COM_R_z = np.array([])
+		for i in trajectoryIndices:
+			self.goto(i)
+			COM_R_z = np.append(COM_R_z, self.COM[-1])
+
+		return COM_R_z
+
+	def getTinNs(self):
+
+		trajectoryIndices = self.getTrajectoryIndices()
+
+		T = np.array([])
+		
+		for i in trajectoryIndices:
+			self.goto(i)
+			T = np.append(T, self.t_inNs)
+
+		return T
+
+	def getRMSF(self):
+
+		protein = self.atoms.select_atoms("protein")
+
+		align.AlignTraj(self.universe,
+						self.universe,
+						select="protein and name CA",
+						in_memory=True).run()
+
+		reference_coordinates = self.universe.trajectory.timeseries(
+						asel=protein).mean(axis=1)
+
+		reference = mda.Merge(protein).load_new(
+						reference_coordinates[:, None, :],
+						order="afc")
+
+		align.AlignTraj(self.universe,
+						reference,
+						select="protein and name CA",
+						in_memory=True).run()
+
+		calphas = protein.select_atoms("name CA")
+
+		rmsfer = RMSF(calphas).run()
+
+		self.rmsf = rmsfer.results.rmsf
+		return rmsfer.results.rmsf
+
+	#TODO: modify this function so you can use the in-built atom object
+	def getHeavyAtomMembraneDistances(self, membrane, sanityCheck = False):
+		
+		protein_cols = [
+			f"{atom.name}_{atom.residue.aminoAcid}_resID{atom.residue.resID}"
+			for atom in self.atoms
+			]
+
+		lipid_rows = [
+ 			f"{atom.name}_{atom.resname}_resID{atom.resID}"
+			for atom in membrane.heavySurfaceAtoms
+			]
+
+		protein_xyz = np.array([atom.r for atom in self.atoms])
+
+		lipid_xyz = np.array([atom.r for atom in membrane.heavySurfaceAtoms])
+
+		if sanityCheck:
+			self.protein_xyz = protein_xyz
+			self.lipid_xyz = lipid_xyz
+
+		distances = np.linalg.norm(
+			lipid_xyz[:, None, :] - protein_xyz[None, :, :],
+			axis=2
+		)
+
+		return pd.DataFrame(
+				distances,
+				index=lipid_rows,
+				columns=protein_cols)
+
+	def getHeavyAtomMembraneDistanceTensor(self, membrane, 
+						saveFramesAsCSVs = True, 
+						sanityCheck = False):
+
+		#*
+		outdir = Path("tmp")
+		outdir.mkdir(exist_ok=True)
+
+		#*
+		frame_re = re.compile(r"frame(\d{4})\.csv$")
+
+
+		#*
+		completed_frames = []
+		for path in outdir.glob("frame*.csv"):
+			match = frame_re.match(path.name)
+			if match:
+				completed_frames.append(int(match.group(1)))
+
+		#*
+		last_completed = max(completed_frames, default=-1)
+		frames_to_run = [frame for frame in self.getTrajectoryIndices()
+				if frame > last_completed]
+
+		for frame in tqdm(frames_to_run, desc = "Frames elapsed"):
+
+			self.goto(frame)
+
+			Δd_df = self.getHeavyAtomMembraneDistances(membrane,
+								sanityCheck = sanityCheck)
+
+			if sanityCheck:
+
+				print("You are generating position CSVs, rememeber to \n"
+					"remember to use diff *csv to verify \n"
+					"your positions attribute is dynamic")
+				
+				pd.DataFrame(self.protein_xyz).to_csv(
+				f'proteinPositionTmp/proteinFrame{frame:04d}.csv')
+
+				pd.DataFrame(self.lipid_xyz).to_csv(
+				f'lipidPositionTmp/lipidFrame{frame:04d}.csv')
+
+
+			if saveFramesAsCSVs:
+				Δd_df.to_csv(f'tmp/frame{frame:04d}.csv')
+
+				
+		
+
+#NOTE: the lipid subtypes are DPPC, SSM, CHL1, avoid DCLE
+	#NOTE: use the phosphate groups in the DPPC and SSMD and the 03 in the CHL1
+
+class lipid:
+	def __init__(self, universeLipidAtoms):
+		self.universeLipidAtoms = universeLipidAtoms
+
+		for atom in universeLipidAtoms:
+			
+			if atom.resname == "CHL1" and atom.name == "O3":
+				
+				self.representativeAtom = atom
+				self.lipidType = atom.resname
+				break
+			
+			if atom.resname == "SSM" and atom.name == "P":
+			
+				self.representativeAtom = atom
+				self.lipidType = atom.resname
+				break
+			
+			if atom.resname == "DPPC" and atom.name == "P":
+				
+				self.representativeAtom = atom
+				self.lipidType = atom.resname
+				break
+
+			if atom.resname == "PSM" and atom.name == "P":
+				
+				self.representativeAtom = atom
+				self.lipidType = atom.resname
+				break
+
+
+	@property
+	def r(self):
+		return self.representativeAtom.position
+
+	
+
+class membrane:
+
+	def __init__(self, universe):
+		self.universe = universe
+	
+
+	@property
+	def frameNum(self):
+		return self.universe.trajectory.frame
+
+	@property
+	def t_inNs(self):
+		return self.frameNum * 0.2
+
+
+	#This only works under the assumption of harmonic constraints
+		#On the lipids, there would not be much stopping lipid from disolving from
+		#The membrane otherwise
+
+	@property
+	def atoms(self):
+
+		DPPCatoms = self.universe.select_atoms("resname DPPC")
+		SSMatoms = self.universe.select_atoms("resname SSM")
+		CHL1atoms = self.universe.select_atoms("resname CHL1")
+		PSMatoms = self.universe.select_atoms("resname PSM")
+		
+		self.DPPCatoms = DPPCatoms
+		self.SSMatoms = SSMatoms
+		self.CHL1atoms = CHL1atoms
+		self.PSMatoms = PSMatoms
+		
+		atoms = self.DPPCatoms + self.SSMatoms + self.CHL1atoms + self.PSMatoms
+
+		atoms = [atom(MDAatom) for MDAatom in atoms]
+
+		return atoms
+
+	@property
+	def surfaceAtoms(self):
+
+		#Manipulates the atoms property into yielding some helpful attributes
+		atoms = self.atoms
+
+		surfaceAtoms = self.SSMatoms + self.CHL1atoms + self.PSMatoms
+
+		#NOTE: I'd rather use custom atom objects
+		surfaceAtoms = [atom(MDAatom) for MDAatom in surfaceAtoms]
+
+		return surfaceAtoms
+
+	@property
+	def heavySurfaceAtoms(self):
+
+		heavySurfaceAtoms = []
+		for atom in self.surfaceAtoms:
+			if 'H' not in atom.name:
+				heavySurfaceAtoms.append(atom)
+
+		return heavySurfaceAtoms
+
+	@property
+	def lipids(self):
+		lipids = []
+		residues = self.universe.residues
+		for residue in residues:
+			
+			if residue.resname == "DPPC" or \
+			residue.resname == "SSM" or \
+			residue.resname == "CHL1" or \
+			residue.resname == "PSM":
+			
+				lipids.append(lipid(residue.atoms))
+		return lipids
+
+	@property
+	def lipid_Rs(self):
+
+		R = np.zeros((0,3))
+
+		for lipid in self.lipids:
+			R = np.vstack((R, lipid.r))
+
+		return R
+		
+
+	def returnMembraneAtomZ_positions(self):
+
+		R = np.array([])
+		for atom in self.atoms:
+			r = atom.r[-1]
+			R = np.append(R, r)
+
+		return R
+
+	@property
+	def maxZ(self):
+
+		R = self.returnMembraneAtomZ_positions()
+		
+		return max(R)
+	
+	@property
+	def minZ(self):
+
+		R = self.returnMembraneAtomZ_positions()
+
+		return min(R)
+
+	def getTrajectoryIndices(self):
+		return list(range(0, len(self.universe.trajectory)))
+	
+	def goto(self, frameNum):
+		self.universe.trajectory[frameNum]
+
+	def lipidPositionSanityCheck(self, lipidIndex = 0):
+	
+		X = np.array([])
+		Y = np.array([])
+
+		for frame in tqdm(self.getTrajectoryIndices()):
+			self.goto(frame)
+			r = self.lipid_Rs[lipidIndex]
+
+			X = np.append(X, r[0])
+			Y = np.append(Y, r[1])
+
+		plt.plot(X, Y)
+		#Latex text courtesy of chatGPT
+		plt.xlabel(r"$r_y \;(\mathrm{\AA})$")
+		plt.ylabel(r"$r_x \;(\mathrm{\AA})$")
+		plt.title(r"$\text{Single Lipid} r(t)$")
+		plt.show()
+
+	def membranePositionSanityCheck(self,  visualize = False):
+		τ = np.array([])
+		Z = np.array([])
+		for frame in self.getTrajectoryIndices():
+			#Changing frame
+			self.goto(frame)
+
+			#Acquiring temporal data
+			t = self.t_inNs
+			τ = np.append(τ, t)
+
+			#Acquiring positionData
+			Z_max = self.maxZ
+			Z = np.append(Z, Z_max)
+
+		plt.title('The standard deviation should be not more than 5')
+		plt.xlabel('time (ns)')
+		plt.ylabel('position along the z axis (Å)')
+		plt.plot(τ, Z)
+		plt.show()
+
+	
+
+#TODO: modify this to reflect the change in class names 
+#TODO: add a heavy atoms property to your residue
+#TODO: devise an atom constructor
+
+#TODO: debug this
+	#NOTE: you might want to set this function to save the csvs
+
+			
+
+
+
+
+
