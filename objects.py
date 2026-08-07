@@ -1,6 +1,7 @@
 import MDAnalysis as mda
 from MDAnalysis.analysis import align
 from MDAnalysis.analysis.rms import RMSF
+from MDAnalysis.lib.distances import capped_distance
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -321,8 +322,55 @@ class protein:
 			if saveFramesAsCSVs:
 				Δd_df.to_csv(f'tmp/frame{frame:04d}.csv')
 
-				
+            #Strictly speaking, I can engineer this method to run without the membrane instance
+                #;however, I still find it usefull for appreciating the overall workflow
+            
+                #I'd prefer my code be easily comprehended than efficient, given the code is already
+                #complex, anyone can understand that I put a protein and a membrane into a method
+                #to get contact data, but it would be hard to know this without combing through my 
+                #scripts or MDAnalysis documentation
+
+            #NOTE: the cutoff is not a literal cutoff for the contact, I merely need to funnel
+                #the resulting "contacts" into an additional function for soft cutoff classificaiton
+
+            #NOTE: I don't technical use it to define a contact, cutoff is more like a parameter for
+                #search depth
+        
+        
+        def getProteinMembraneAtomContacts(self, membrane, cutoff = 8, savePath):
+            
+            mdaProtein = self.universe.select_atoms("protein")
+            mdaMembrane = membrane.universe.select_atoms "resname DPPC SSM CHL1 PSM")
+
+            ts = self.u.trajectory[self.frameNum]
+
+            pairs, distances = capped_distance(
+                protein.positions,
+                membrane.positions,
+                max_cutoff=cutoff,
+                box=self.u.trajectory[self.frameNum],
+                return_distances=True
+                )
+
+            proteinContactIndices = pairs[:, 0]
+            membraneContactIndices = pairs[:, 1]
+            distances = distances
+            #NOTE: the function here utilizes the Best-Hummer_Eaton approximation
+            softContacts = [functions.computeContact(d) for d in distances]
+
+            return proteinContactIndices, membraneContactIndices, distances, softContacts
+
+        #TODO: finish fleshing out this function
+        def getProteinMembraneAtomContactsAcrossFrames(self, membrane, cutoff=8):
+
+            for i in trajectoryIndices:
 		
+                self.goto(i)
+
+                self.getProteinMembraneAtomContacts
+
+
+
 
 #NOTE: the lipid subtypes are DPPC, SSM, CHL1, avoid DCLE
 	#NOTE: use the phosphate groups in the DPPC and SSMD and the 03 in the CHL1
