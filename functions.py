@@ -297,3 +297,336 @@ def getInteractionFraction(topology, trajectory, contactCutoff=8, stride=1):
 
 def computeContact(d):
     return 1/(1+np.exp(5*(d-4)))
+import re
+import pandas as pd
+
+import colvarObjects
+
+_TOKEN_RE = re.compile(r"[{}()]|,|[^\s{}(),]+")
+
+#Author: chatGPT
+def tokenize_colvars(text):
+	tokens = []
+
+	for line in text.splitlines():
+		line = line.split("#", 1)[0].strip()
+
+		if not line:
+			continue
+
+		tokens.extend(_TOKEN_RE.findall(line))
+		tokens.append("\n")
+
+	return tokens
+
+#Author: chatGPT
+def atom(token):
+	if re.fullmatch(r"[-+]?\d+", token):
+		return int(token)
+
+	if re.fullmatch(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?", token):
+		return float(token)
+
+	return token
+
+#Author: chatGPT
+def clean_values(values):
+	values = [v for v in values if v not in ("\n", ",", "(", ")")]
+	values = [atom(v) for v in values]
+
+	if len(values) == 1:
+		return values[0]
+
+	return values
+
+#Author: chatGPT
+def add_entry(d, key, value):
+	if key in d:
+		if not isinstance(d[key], list):
+			d[key] = [d[key]]
+
+		d[key].append(value)
+	else:
+		d[key] = value
+
+#Author: chatGPT
+def find_matching_brace(tokens, start):
+	depth = 0
+
+	for i in range(start, len(tokens)):
+		if tokens[i] == "{":
+			depth += 1
+		elif tokens[i] == "}":
+			depth -= 1
+
+			if depth == 0:
+				return i
+
+	raise ValueError("Unclosed brace")
+
+#Author: chatGPT
+def block_is_value_list(tokens, start):
+	end = find_matching_brace(tokens, start - 1)
+	inner = [t for t in tokens[start:end] if t != "\n"]
+
+	return inner and "{" not in inner and "}" not in inner
+
+#Author: chatGPT
+def parse_block(tokens, index):
+	result = {}
+
+	while index < len(tokens):
+		token = tokens[index]
+
+		if token == "\n":
+			index += 1
+			continue
+
+		if token == "}":
+			return result, index + 1
+
+		key = token
+		index += 1
+
+		while index < len(tokens) and tokens[index] == "\n":
+			index += 1
+
+		if index < len(tokens) and tokens[index] == "{":
+			index += 1
+
+			if block_is_value_list(tokens, index):
+				values = []
+
+				while tokens[index] != "}":
+					values.append(tokens[index])
+					index += 1
+
+				index += 1
+				add_entry(result, key, clean_values(values))
+			else:
+				value, index = parse_block(tokens, index)
+				add_entry(result, key, value)
+
+		else:
+			values = []
+
+			while index < len(tokens) and tokens[index] not in ("\n", "}"):
+				values.append(tokens[index])
+				index += 1
+
+			add_entry(result, key, clean_values(values))
+
+	return result, index
+
+#Author: chatGPT
+def parse_colvars_file(text):
+	tokens = tokenize_colvars(text)
+	parsed = {}
+	index = 0
+
+	while index < len(tokens):
+		if tokens[index] == "\n":
+			index += 1
+			continue
+
+		block_type = tokens[index]
+		index += 1
+
+		while index < len(tokens) and tokens[index] == "\n":
+			index += 1
+
+		if index >= len(tokens) or tokens[index] != "{":
+			raise ValueError(f"Expected '{{' after {block_type!r}; got {tokens[index]!r}")
+
+		index += 1
+		block, index = parse_block(tokens, index)
+
+		if block_type == "colvar" and "name" in block:
+			parsed.setdefault("colvar", {})[block["name"]] = block
+
+		elif block_type == "harmonic" and "colvars" in block:
+			parsed.setdefault("harmonic", {})[block["colvars"]] = block
+
+		else:
+			parsed.setdefault(block_type, []).append(block)
+
+	return parsed
+
+def col2Colvar(colvarFile, debug1 = False, debug2 = False):
+
+	colvarText = open(colvarFile).read()
+	CH_dict = parse_colvars_file(colvarText)
+
+	'''
+	#NOTE: output is: 
+		#colvar
+		#harmonic
+	for key in colvarDict.keys():
+		print(key)
+	'''
+
+	colvarDict = CH_dict['colvar']
+	if debug1:
+	
+		exampleKey = list(colvarDict.keys())[0]
+			
+		print("////////////////////////////////////////")
+		print("ColvarDict")
+		print(colvarDict[exampleKey])
+		print("////////////////////////////////////////")
+
+	colvarInstances = []
+	colvarNames = colvarDict.keys()
+	for colvarName in colvarNames:
+		colvarInstances.append(colvarObjects.colvar(colvarDict[colvarName]))
+
+	if debug2:
+		exampleColvar = colvarInstances[0]
+
+		print("////////////////////////////////////////")
+		print('colvar attributes')
+		print(dir(exampleColvar))
+		print("////////////////////////////////////////")
+
+	harmonicInstances = []
+	harmonicDict = CH_dict['harmonic']
+	for harmonicDictKey in harmonicDict.keys():
+		harmonicInstances.append(colvarObjects.harmonic(harmonicDict[harmonicDictKey]))
+
+
+	for colvarInstance in colvarInstances:
+		for harmonicInstance in harmonicInstances:
+			if colvarInstance.name == harmonicInstance.colvarName:
+				colvarInstance.addHarmonic(harmonicInstance)
+
+	return colvarInstances
+
+
+def colvarTypeSanityCheck(colvarInstances):
+        
+        print("***************************************")
+
+        for colvarInstance in colvarInstances:
+                
+                colvarInstance.determineType()
+
+                if colvarInstance.type == 1:
+                        
+                        colvarInstance.determineTypeSanityCheck()
+
+                        break
+
+        print("***************************************")
+
+        for colvarInstance in colvarInstances:
+                
+                colvarInstance.determineType()
+
+                if colvarInstance.type == 2:
+
+                        colvarInstance.determineTypeSanityCheck()
+
+                        break
+
+        print("***************************************")
+
+def dataStructureSanityCheck(colvarInstances):
+        for colvarInstance in colvarInstances:
+                colvarType = colvarInstance.determineType()
+                if colvarType == 1:
+                        print("********************************")
+                        print(colvarInstance.harmonic.forceConstant)
+                        print(type(colvarInstance.harmonic.forceConstant))
+                        print("********************************")
+                elif colvarType == 2:
+                        print("********************************")
+                        print(type(colvarInstance.lowerwallconstant))
+                        print(type(colvarInstance.upperwallconstant))
+                        print("********************************")
+                        print(dir(colvarInstance))
+                        raise Exception("Stop here")
+
+
+'''
+def modColvarSprings(colvarFile,
+                                forceConstant,
+                                upperWallConstant,
+                                lowerWallConstant,
+                                sanityCheck = False):
+
+                colvarInstances = col2Colvar(colvarFile)
+
+                for colvarInstance in colvarInstances:
+                        colvarType = colvarInstance.determineType()
+
+                        if colvarType == 1:
+
+                                colvarInstance.harmonic.forceConstant = forceConstant
+
+                                if sanityCheck:
+                                        print("type 1 exec")
+
+                        elif colvarType == 2:
+
+                                colvarInstance.lowerwallconstant = lowerWallConstant
+                                colvarInstance.upperwallconstant = upperWallConstant
+
+                                if sanityCheck:
+                                        print("!!!")
+                                        print("type 2 exec")
+                                        raise Exception("No point in proceeding")
+'''
+
+def modColvarSprings(colvarInstance,
+                                forceConstant,
+                                upperWallConstant,
+                                lowerWallConstant):
+
+    colvarType = colvarInstance.determineType()
+
+    if colvarType == 1:
+
+        colvarInstance.harmonic.forceConstant = forceConstant
+
+    elif colvarType == 2:
+
+        colvarInstance.lowerwallconstant = lowerWallConstant
+        colvarInstance.upperwallconstant = upperWallConstant
+
+
+def colvarInstances2ColvarFile(colvarInstances, outputColvarFile):
+
+        blockStrings = []
+
+        for colvarInstance in colvarInstances:
+
+                blockStrings.append(colvarInstance.constructBlock())
+
+        with open(outputColvarFile, "w") as outputFile:
+                outputFile.write("\n".join(blockStrings) + "\n")
+
+
+def modifyColvarParametersWithCSVParameters(springParametersCSV, colvarFile, sanityCheck = False):
+
+
+	df = pd.read_csv(springParametersCSV)
+	colvarInstances = col2Colvar(colvarFile)
+        
+	for i in df.index:
+		forceConstant = df.at[i, 'forceConstant']
+		upperWallConstant = df.at[i, 'upperWallConstant']
+		lowerWallConstant = df.at[i, 'lowerWallConstant']
+
+		for colvarInstance in colvarInstances:
+
+			modColvarSprings(colvarInstance,
+					forceConstant,
+					upperWallConstant,
+					lowerWallConstant)
+
+		colvarInstances2ColvarFile(colvarInstances, 
+			f"membrane_hmmm_restraint_fixed_{forceConstant}_"
+			f"{upperWallConstant}_{lowerWallConstant}.namd.col")
+
+
+

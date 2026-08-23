@@ -582,3 +582,154 @@ class membrane:
 
 
 
+import colvarFunctions
+
+#NOTE: be mindful of the dummyAtom text or you will botch the file regen
+class distanceZ:
+	def __init__(self, atomNumbers, dummyAtom, axis):
+		self.atomNumbers = atomNumbers
+		self.dummyAtom = dummyAtom
+		self.axis = axis
+
+#NOTE: this script presumes you are passing the colvar dict into the
+	#NOTE: constructor
+class colvar:
+	def __init__(self, blockDict):
+		try:
+			self.name = blockDict['name']
+		except:
+			pass
+
+		try:
+			self.distanceZInstance = distanceZ(blockDict['distanceZ']['main']['atomNumbers'], blockDict['distanceZ']['ref'][1:], blockDict['distanceZ']['axis'])
+		except:
+			pass
+		
+		try:
+			self.upperWall = blockDict['upperWall']
+		except:
+			pass
+		
+		try:
+			self.upperBoundary = blockDict['upperBoundary']
+		except:
+			pass
+		
+		try:
+			self.upperwallconstant = blockDict['upperwallconstant']
+		except:
+			pass
+		
+		try:
+			self.lowerWall = blockDict['lowerWall']
+		except:
+			pass
+		
+		try:
+			self.lowerBoundary = blockDict['lowerBoundary']
+		except:
+			pass
+		
+		try:
+			self.lowerwallconstant = blockDict['lowerwallconstant']
+		except:
+			pass
+
+	def addHarmonic(self, harmonic):
+		self.harmonic = harmonic
+	
+	#NOTE: There are two types of colvars included in the *col file
+		#NOTE: this determines which kind I have loaded
+	def determineType(self):
+		try:
+			self.upperWall
+			self.upperBoundary
+			self.upperwallconstant
+			self.lowerWall
+			self.lowerBoundary
+			self.lowerwallconstant
+			
+			self.type = 2
+
+		except:
+
+			self.type = 1
+
+		return self.type
+
+	def determineTypeSanityCheck(self):
+
+		self.determineType()
+
+		print(f"the type is: {self.type}")
+		print("The other attributes are:")
+		for attribute in dir(self):
+			print(attribute)
+
+	def constructBlock(self):
+
+		self.determineType()
+
+		if self.type == 1:
+
+			blockString = (
+				f"colvar {{\n"
+				f"    name {self.name}\n"
+				f"    distanceZ {{\n"
+				f"        main {{ atomNumbers {{ {self.distanceZInstance.atomNumbers[0]} {self.distanceZInstance.atomNumbers[-1]} }} }}\n"
+				f"        ref {{ dummyAtom ( {self.distanceZInstance.dummyAtom[0]}, {self.distanceZInstance.dummyAtom[1]}, {self.distanceZInstance.dummyAtom[2]} ) }}\n"
+				f"        axis ({self.distanceZInstance.axis[0]}, {self.distanceZInstance.axis[1]}, {self.distanceZInstance.axis[2]})\n"
+				f"    }}\n"
+				f"}}\n"
+				f"harmonic {{\n"
+				f"    colvars {self.harmonic.colvarName}\n"
+				f"    centers {self.harmonic.centers}\n"
+				f"    forceConstant {self.harmonic.forceConstant}\n"
+				f"}}")
+
+			return blockString
+
+		elif self.type == 2:
+
+			atomNumbersString = " ".join(str(atomNumber) for atomNumber in self.distanceZInstance.atomNumbers)
+
+			blockString = (
+				f"colvar {{\n"
+				f"    name {self.name}\n"
+				f"    upperWall         {self.upperWall}\n"
+				f"    upperBoundary     {self.upperBoundary}\n"
+				f"    upperwallconstant {self.upperwallconstant}\n"
+				f"    lowerWall         {self.lowerWall}\n"
+				f"    lowerBoundary     {self.lowerBoundary}\n"
+				f"    lowerwallconstant {self.lowerwallconstant}\n"
+				f"    distanceZ {{\n"
+				f"        main {{ atomNumbers {{ {atomNumbersString} }} }}\n"
+				f"        ref {{ dummyAtom ( {self.distanceZInstance.dummyAtom[0]}, {self.distanceZInstance.dummyAtom[1]}, {self.distanceZInstance.dummyAtom[2]} ) }}\n"
+				f"        axis ({self.distanceZInstance.axis[0]}, {self.distanceZInstance.axis[1]}, {self.distanceZInstance.axis[2]})\n"
+				f"    }}\n"
+				f"}}"
+			)
+
+			return blockString
+
+		else:
+			raise Exception("Alex WTF!?")
+
+				
+		
+			
+
+
+class harmonic:
+	def __init__(self, harmonicDict):
+		self.colvarName = harmonicDict['colvars']
+		self.centers = harmonicDict['centers']
+		self.forceConstant = harmonicDict['forceConstant']
+
+#NOTE: this instance is courtesy of chatGPT..... and a complete pain in my butt
+class block:
+	def __init__(self, name, entries=None):
+		self.name = name
+		self.entries = entries if entries is not None else []
+
+	
