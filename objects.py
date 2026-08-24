@@ -337,37 +337,37 @@ class protein:
                 #search depth
         
         
-        def getProteinMembraneAtomContacts(self, membrane, cutoff = 8, savePath):
-            
-            mdaProtein = self.universe.select_atoms("protein")
-            mdaMembrane = membrane.universe.select_atoms "resname DPPC SSM CHL1 PSM")
-
-            ts = self.u.trajectory[self.frameNum]
-
-            pairs, distances = capped_distance(
-                protein.positions,
-                membrane.positions,
-                max_cutoff=cutoff,
-                box=self.u.trajectory[self.frameNum],
-                return_distances=True
-                )
-
-            proteinContactIndices = pairs[:, 0]
-            membraneContactIndices = pairs[:, 1]
-            distances = distances
-            #NOTE: the function here utilizes the Best-Hummer_Eaton approximation
-            softContacts = [functions.computeContact(d) for d in distances]
-
-            return proteinContactIndices, membraneContactIndices, distances, softContacts
-
-        #TODO: finish fleshing out this function
-        def getProteinMembraneAtomContactsAcrossFrames(self, membrane, cutoff=8):
-
-            for i in trajectoryIndices:
+	def getProteinMembraneAtomContacts(self, membrane, cutoff = 8, savePath = "./tmp"):
 		
-                self.goto(i)
+		mdaProtein = self.universe.select_atoms("protein")
+		mdaMembrane = membrane.universe.select_atoms("resname DPPC SSM CHL1 PSM")
+		
+		ts = self.u.trajectory[self.frameNum]
+		
+		pairs, distances = capped_distance(
+			protein.positions,
+			membrane.positions,
+			max_cutoff=cutoff,
+			box=self.u.trajectory[self.frameNum],
+			return_distances=True
+			)
+			
+		proteinContactIndices = pairs[:, 0]
+		membraneContactIndices = pairs[:, 1]
+		distances = distances
+		#NOTE: the function here utilizes the Best-Hummer_Eaton approximation
+		softContacts = [functions.computeContact(d) for d in distances]
+		
+		return proteinContactIndices, membraneContactIndices, distances, softContacts
+		
+		#TODO: finish fleshing out this function
+		def getProteinMembraneAtomContactsAcrossFrames(self, membrane, cutoff=8):
+		
+			for i in trajectoryIndices:
+			
+				self.goto(i)
 
-                self.getProteinMembraneAtomContacts
+				self.getProteinMembraneAtomContacts
 
 
 
@@ -576,13 +576,6 @@ class membrane:
 #TODO: debug this
 	#NOTE: you might want to set this function to save the csvs
 
-			
-
-
-
-
-
-import colvarFunctions
 
 #NOTE: be mindful of the dummyAtom text or you will botch the file regen
 class distanceZ:

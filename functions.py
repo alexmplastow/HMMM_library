@@ -3,6 +3,8 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import MDAnalysis
+import re
+import pandas as pd
 
 def getProteinCOMandLeafletZs(proteinInstance, membraneInstance):
 
@@ -297,10 +299,6 @@ def getInteractionFraction(topology, trajectory, contactCutoff=8, stride=1):
 
 def computeContact(d):
     return 1/(1+np.exp(5*(d-4)))
-import re
-import pandas as pd
-
-import colvarObjects
 
 _TOKEN_RE = re.compile(r"[{}()]|,|[^\s{}(),]+")
 
@@ -478,7 +476,7 @@ def col2Colvar(colvarFile, debug1 = False, debug2 = False):
 	colvarInstances = []
 	colvarNames = colvarDict.keys()
 	for colvarName in colvarNames:
-		colvarInstances.append(colvarObjects.colvar(colvarDict[colvarName]))
+		colvarInstances.append(objects.colvar(colvarDict[colvarName]))
 
 	if debug2:
 		exampleColvar = colvarInstances[0]
@@ -491,7 +489,7 @@ def col2Colvar(colvarFile, debug1 = False, debug2 = False):
 	harmonicInstances = []
 	harmonicDict = CH_dict['harmonic']
 	for harmonicDictKey in harmonicDict.keys():
-		harmonicInstances.append(colvarObjects.harmonic(harmonicDict[harmonicDictKey]))
+		harmonicInstances.append(objects.harmonic(harmonicDict[harmonicDictKey]))
 
 
 	for colvarInstance in colvarInstances:
