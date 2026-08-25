@@ -76,6 +76,7 @@ class atom:
 		self.resname = MDAatom.resname
 		self.resID = MDAatom.resid
 		self.name = MDAatom.name
+		self.index = MDAatom.index
 
 	@property
 	def r(self):
@@ -405,6 +406,9 @@ class lipid:
 				self.lipidType = atom.resname
 				break
 
+	@property
+	def atoms(self):
+		return [atom(mdaAtom) for mdaAtom in self.universeLipidAtoms]
 
 	@property
 	def r(self):
@@ -416,7 +420,6 @@ class membrane:
 
 	def __init__(self, universe):
 		self.universe = universe
-	
 
 	@property
 	def frameNum(self):
@@ -473,8 +476,11 @@ class membrane:
 
 		return heavySurfaceAtoms
 
+	#NOTE: it seems I was a little overzealous with the properties
+		#NOTE: most of the associated meta-data will be static now
 	@property
 	def lipids(self):
+		
 		lipids = []
 		residues = self.universe.residues
 		for residue in residues:
@@ -485,6 +491,14 @@ class membrane:
 			residue.resname == "PSM":
 			
 				lipids.append(lipid(residue.atoms))
+
+		#First checking if there are colvarIndices within the membrane object's memory
+		if hasattr(self, "lipidColvarIndicesList"):
+
+			for scopeLipid, colvarIndices in zip(lipids, self.lipidColvarIndicesList):
+
+				scopeLipid.colvarIndices = colvarIndices
+
 		return lipids
 
 	@property
@@ -567,7 +581,127 @@ class membrane:
 		plt.plot(τ, Z)
 		plt.show()
 
-	
+
+class solventResidue:
+	def __init__(self, universeResidue):
+		self.universeResidue = universeResidue
+		self.resname = self.universeResidue.resname
+		self.resID = self.universeResidue.resid
+
+	@property
+	def atoms(self):
+		return [atom(mdaAtom) for mdaAtom in self.universeResidue.atoms]
+
+#The common solvent name or resnames in VMD speak are SCSE and DCLE/DCLED	
+class hmmmMembrane(membrane):
+
+	def __init__(self, universe, solventResname = "SCSE"):
+		super().__init__(universe)
+		self.solventResname = solventResname
+
+
+	#I would simply treat this as entirely separate from your lipid attributes
+	@property
+	def solventResidues(self):
+		
+		solventResidues = [
+			solventResidue(mdaResidue) for mdaResidue in
+			self.universe.select_atoms(f"resname {self.solventResname}").residues]
+
+		#TODO: This is just a template, from the lipid example, it will need updating
+			#TODO: make sure it is updated when the time comes
+		#First checking if there are colvarIndices within the membrane object's memory
+		if hasattr(self, "solventColvarIndicesList"):
+
+			for scopeSolventResidue, colvarIndices in zip(solventResidues, 
+							self.solventColvarIndicesList):
+
+				scopeSolventResidue.colvarIndices = colvarIndices
+
+		return solventResidues
+
+	def solventAtoms(self):
+
+		solventAtoms = [
+			atom(mdaAtom) for mdaAtom in
+			self.universe.select_atoms(f"resname {self.solventResname}")
+		]
+		return solventAtoms
+
+	#DCLE
+	#Charm GUI gives ssm's terminal carbons [CST, CFT] 
+		# and dppc's terminal carbon [C2T,C3T]	
+
+	#SCSE
+	#My/Muyun's implementation uses [C6S, C6F] for SSM
+		#dppc's terminal carbon is [C26, C36]
+
+	def addConstraintIndicesToEachLipid(self, 
+						SSMname = ['CST', 'CFT'], 
+						DPPCname = ['C2T', 'C3T']):
+
+		indexFindingBool = False
+		#NOTE: I do not like using lists in this way, but to keep 
+			#NOTE: the colvar indices glued to my residue, I must
+			#NOTE: first generate one such instance which is logged into
+			#NOTE: the membrane objects memory
+
+		colvarIndicesList = []
+		#Adding the colvar indices for each lipid
+		for lipid in self.lipids:
+			lipid.colvarIndices = []
+			for atom in lipid.atoms:
+				if atom.name == SSMname[0] or atom.name == SSMname[-1]:
+					lipid.colvarIndices.append(atom.index)
+					indexFindingBool = True
+
+				elif atom.name == DPPCname[0] or atom.name == DPPCname[-1]:
+					lipid.colvarIndices.append(atom.index)
+					indexFindingBool = True
+
+			colvarIndicesList.append(lipid.colvarIndices)
+
+		self.lipidColvarIndicesList = colvarIndicesList
+
+			
+
+
+
+				#TODO add one for DPPC
+
+		if not indexFindingBool:
+			raise Exception(f"Not a single {SSMname[0]},{SSMname[-1]},"
+					f"{DPPCname[0]}, or {DPPCname[-1]} was found")
+
+		print('Colvar Indices attribute added to lipids')
+
+	#NOTE: the other parameter is SCSE
+	def addConstraintIndicesToEachSolventResidue(self):
+		
+		if self.solventResname == 'DCLE':
+			atomNames = ['C1', 'CL11', 'CL12', 'C2']
+		
+		elif self.solventResname == 'SCSE':
+			atomNames = ['C1', 'C2']
+
+		colvarIndicesList = []
+		for solventResidue in self.solventResidues:
+			
+			solventResidue.colvarIndices = []
+			for atom in solventResidue.atoms:
+				if atom.name in atomNames:
+					solventResidue.colvarIndices.append(atom.index)
+
+			colvarIndicesList.append(solventResidue.colvarIndices)
+
+		self.solventColvarIndicesList = colvarIndicesList
+
+		print('Colvar Indices attribute added to solventResidues')
+
+							
+
+	#@property
+	#def residues(self):	
 
 #TODO: modify this to reflect the change in class names 
 #TODO: add a heavy atoms property to your residue
@@ -650,6 +784,11 @@ class colvar:
 
 		return self.type
 
+	#Note: Static, but best treated as an attribute
+	@property
+	def colvarType(self):
+		return self.determineType()
+
 	def determineTypeSanityCheck(self):
 
 		self.determineType()
@@ -658,6 +797,25 @@ class colvar:
 		print("The other attributes are:")
 		for attribute in dir(self):
 			print(attribute)
+
+	#NOTE: static
+	@property
+	def atomNumbersString(self):
+
+		if self.colvarType == 1:
+
+			atomNumbersString = (
+				f"{self.distanceZInstance.atomNumbers[0]} "
+				f"{self.distanceZInstance.atomNumbers[-1]}"
+				)
+
+		if self.colvarType == 2:
+
+			atomNumbersString = (
+				" ".join(str(atomNumber) for atomNumber in self.distanceZInstance.atomNumbers)
+				)
+
+		return atomNumbersString
 
 	def constructBlock(self):
 
@@ -669,7 +827,7 @@ class colvar:
 				f"colvar {{\n"
 				f"    name {self.name}\n"
 				f"    distanceZ {{\n"
-				f"        main {{ atomNumbers {{ {self.distanceZInstance.atomNumbers[0]} {self.distanceZInstance.atomNumbers[-1]} }} }}\n"
+				f"        main {{ atomNumbers {{ {self.atomNumbersString} }} }}\n"
 				f"        ref {{ dummyAtom ( {self.distanceZInstance.dummyAtom[0]}, {self.distanceZInstance.dummyAtom[1]}, {self.distanceZInstance.dummyAtom[2]} ) }}\n"
 				f"        axis ({self.distanceZInstance.axis[0]}, {self.distanceZInstance.axis[1]}, {self.distanceZInstance.axis[2]})\n"
 				f"    }}\n"
@@ -684,8 +842,6 @@ class colvar:
 
 		elif self.type == 2:
 
-			atomNumbersString = " ".join(str(atomNumber) for atomNumber in self.distanceZInstance.atomNumbers)
-
 			blockString = (
 				f"colvar {{\n"
 				f"    name {self.name}\n"
@@ -696,7 +852,7 @@ class colvar:
 				f"    lowerBoundary     {self.lowerBoundary}\n"
 				f"    lowerwallconstant {self.lowerwallconstant}\n"
 				f"    distanceZ {{\n"
-				f"        main {{ atomNumbers {{ {atomNumbersString} }} }}\n"
+				f"        main {{ atomNumbers {{ {self.atomNumbersString} }} }}\n"
 				f"        ref {{ dummyAtom ( {self.distanceZInstance.dummyAtom[0]}, {self.distanceZInstance.dummyAtom[1]}, {self.distanceZInstance.dummyAtom[2]} ) }}\n"
 				f"        axis ({self.distanceZInstance.axis[0]}, {self.distanceZInstance.axis[1]}, {self.distanceZInstance.axis[2]})\n"
 				f"    }}\n"
@@ -719,7 +875,7 @@ class harmonic:
 		self.centers = harmonicDict['centers']
 		self.forceConstant = harmonicDict['forceConstant']
 
-#NOTE: this instance is courtesy of chatGPT..... and a complete pain in my butt
+#NOTE: this class is courtesy of chatGPT..... and a complete pain in my butt
 class block:
 	def __init__(self, name, entries=None):
 		self.name = name
