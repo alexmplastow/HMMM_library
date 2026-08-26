@@ -1,6 +1,6 @@
 # HMMM_library
 
-A collection of objects and functions which wraps mostly MDAnalysis objects to provide trejectory awary representation of protines...sorry I'm getting a phone call
+A collection of objects and functions which wraps mostly MDAnalysis objects to provide trejectory aware representation of proteines and membranes. I devised this to keep my analyses boiled down to the bare bones.
 
 | Object           | Description                                                                                                                                                                                                             |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
