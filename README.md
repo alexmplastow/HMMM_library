@@ -18,15 +18,15 @@ A collection of objects and functions which wraps mostly MDAnalysis objects to p
 
 The library includes functions for:
 
-  Tracking the protein center of mass relative to the membrane leaflets.
-  Calculating Euclidean distances and identifying protein–lipid contacts within a specified cutoff.
-  Counting contacts by protein residue, trajectory frame, or lipid type.
-  Calculating the fraction of simulation frames containing protein–membrane contact.
-  Plotting contact distributions and generating trajectory sanity checks.
-  Removing equilibration frames from a trajectory.
-  Converting atom distances into smooth contact scores using a sigmoidal switching function.
-  Parsing NAMD colvar files into Python objects.
-  Modifying harmonic and boundary force constants programmatically or from a CSV file.
-  Reconstructing and writing modified NAMD colvar files.
+- Tracking the protein center of mass relative to the membrane leaflets.
+- Calculating Euclidean distances and identifying protein–lipid contacts within a specified cutoff.
+- Counting contacts by protein residue, trajectory frame, or lipid type.
+- Calculating the fraction of simulation frames containing protein–membrane contact.
+- Plotting contact distributions and generating trajectory sanity checks.
+- Removing equilibration frames from a trajectory.
+- Converting atom distances into smooth contact scores using a sigmoidal switching function.
+- Parsing NAMD colvar files into Python objects.
+- Modifying harmonic and boundary force constants programmatically or from a CSV file.
+- Reconstructing and writing modified NAMD colvar files.
 
 This description is LLM-generated; 80% of my code is not
