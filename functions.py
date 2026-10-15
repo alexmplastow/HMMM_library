@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import MDAnalysis
 import re
 import pandas as pd
+import copy
 
 def getProteinCOMandLeafletZs(proteinInstance, membraneInstance):
 
@@ -625,6 +626,131 @@ def modifyColvarParametersWithCSVParameters(springParametersCSV, colvarFile, san
 		colvarInstances2ColvarFile(colvarInstances, 
 			f"membrane_hmmm_restraint_fixed_{forceConstant}_"
 			f"{upperWallConstant}_{lowerWallConstant}.namd.col")
+
+
+def colvarAtomIndexSanityCheck(exampleColvars):
+        type1Collected = False
+        type2Collected = False
+        for colvar in exampleColvars:
+                colvar.determineType()
+                if colvar.type == 1 and not type1Collected:
+                        type1Collected = True
+                        type1ColvarInstance = colvar
+
+                elif colvar.type == 2 and not type2Collected:
+                        type2Collected = True
+                        type2ColvarInstance = colvar
+
+                elif type1Collected and type2Collected:
+                        break
+
+        print(type1ColvarInstance.constructBlock())
+        print("///////////////////////")
+        print(type2ColvarInstance.constructBlock())
+
+        print(type1ColvarInstance.atomNumbersString)
+        print(type2ColvarInstance.atomNumbersString)
+
+def checkHMMMUniverseConstraintAtomsSanityCheck(hmmmMembrane):
+
+	hmmmMembrane.addConstraintIndicesToEachLipid()
+	hmmmMembrane.addConstraintIndicesToEachSolventResidue()
+
+	for lipid in hmmmMembrane.lipids:
+		print(lipid.colvarIndices)
+		print('sanity check cleared, assuming there are indices here')
+		break
+
+	for solventResidue in hmmmMembrane.solventResidues:
+		print(solventResidue.colvarIndices)
+		print('sanity check cleared, assuming there are indices here')
+		break
+
+	#One more detail to check if the colvarIndices are correctly matched with their residues
+
+	exampleLipidIndices = [atom.index for atom in hmmmMembrane.lipids[0].atoms]
+	exampleLipidColvarIndices = hmmmMembrane.lipids[0].colvarIndices
+
+	print("Example lipid indices")
+	print(exampleLipidIndices)
+	print("Example colvarIndices")
+	print(exampleLipidColvarIndices)
+
+	exampleSolventResidueIndices = [atom.index for atom in hmmmMembrane.solventResidues[0].atoms]
+	exampleSolventResidueColvarIndices = hmmmMembrane.solventResidues[0].colvarIndices
+
+	print("Example solvent indices")
+	print(exampleSolventResidueIndices)
+	print("Example solvent colvarIndices")
+	print(exampleSolventResidueColvarIndices)
+
+def translateCharmmColvarFileToSCSEColvars(exampleColvars, scseHmmmMembraneInstance):
+
+	#Collecting a type 1 colvar and 2 colvars
+	def collectColvar(typeNO, exampleColvars = exampleColvars):
+		for exampleColvar in exampleColvars:
+			if exampleColvar.colvarType == typeNO:
+				return exampleColvar
+
+	type1Colvar = collectColvar(typeNO = 1)
+	type2Colvar = collectColvar(typeNO = 2)
+
+	#Adding the usefull indices to scseHmmmMembraneInstance
+	scseHmmmMembraneInstance.addConstraintIndicesToEachLipid(SSMname = ['C6S', 'C6F'],
+								DPPCname = ['C26', 'C36'])
+
+	scseHmmmMembraneInstance.addConstraintIndicesToEachSolventResidue()
+
+	#Now, collecting the lipids from the scseHmmmMembraneInstance
+
+	lipidColvars = []
+	ctlIndex = 0
+	for lipid in scseHmmmMembraneInstance.lipids:
+
+		#I will not be adding constraints to the lipids in this implementation
+		if lipid.lipidType == 'CHL1':
+			continue
+
+		#Collecting usefull meta-data
+		colvarIndices = lipid.colvarIndices
+		nameIndex = ctlIndex
+
+		#Creating a copy of my colvar instance
+		templateColvar = copy.deepcopy(type1Colvar)
+
+		#I have this set to over overide the atomNumbersString attribute
+			#Not that it makes much difference other than readability
+		templateColvar.manualAtomNumbersString = ' '.join(colvarIndices)
+		templateColvar.name = f'ctl{ctlIndex}'
+
+		#Incrementing for the subsequent residue
+		ctlIndex += 1
+
+		#Now adding that pesky colvar
+		lipidColvars.append(templateColvar)
+
+	#Now for the solvent
+	hmmmSolventColvars = []
+	for solventResidue in scseHmmmMembraneInstance.solventResidues:
+
+		#Collecting usefull meta-data
+		colvarIndices = solventResidue.colvarIndices
+		colvarName = f"SCSE{solventResidue.resID}"
+
+		#Creating a copy of my colvar instance
+		templateColvar = copy.deepcopy(type2Colvar)
+
+		#I have this set to over overide the atomNumbersString attribute
+		#Not that it makes much difference other than readability
+		templateColvar.manualAtomNumbersString = ' '.join(colvarIndices)
+		templateColvar.name = colvarName
+
+		#Now adding the colvar
+		hmmmSolventColvars.append(templateColvar)
+
+	#These colvars are a package deal 👬
+	return lipidColvars + hmmmSolventColvars
+
 
 
 
