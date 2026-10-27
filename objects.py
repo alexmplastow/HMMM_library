@@ -657,6 +657,9 @@ class membrane:
 		plt.plot(τ, Z)
 		plt.show()
 
+	def getLeaflets(self):
+		print("Just printing this to see if I have the right authorizaiton from git")
+
 
 class solventResidue:
 	def __init__(self, universeResidue):
