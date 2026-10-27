@@ -364,87 +364,79 @@ class protein:
 		
 		return proteinContactIndices, membraneContactIndices, distances, softContacts
 		
-		#TODO: finish fleshing out this function
-		def getProteinMembraneAtomContactsAcrossFrames(self, membrane, cutoff=8):
+	#TODO: finish fleshing out this function
+	def getProteinMembraneAtomContactsAcrossFrames(self, membrane, cutoff=8):
 		
-			for i in trajectoryIndices:
+		for i in trajectoryIndices:
 			
-				self.goto(i)
+			self.goto(i)
 
-				self.getProteinMembraneAtomContacts
+			self.getProteinMembraneAtomContacts
 
-		#NOTE: I'm not defining an axis of rotation, I'm defining the extent to 
-			#Which the protein should be rotated in the three dimensions of
-			#a classical cartesian plane
-		def rotate(self, θ_x, θ_y, θ_z):
+	#NOTE: I'm not defining an axis of rotation, I'm defining the extent to 
+		#Which the protein should be rotated in the three dimensions of
+		#a classical cartesian plane
+	def rotate(self, θ_x, θ_y, θ_z):
 
-			#NOTE: there is no sense in reinventing Rodrigues' rotation
-				#NOTE: trick, so I will simply implement the rotation
-				#NOTE: in mdanalyis and redefine atom
-				#NOTE: positions accordingly
-				#NOTE: you will need to update the atoms
-				#NOTE: attribute to check if this rotation has
-				#NOTE: been performed, also, print a warning
-				#NOTE: so you don't find yourself doing this with
-				#NOTE: trajectory data
-				#NOTE: be careful to ensure the residues handle the
-				#NOTE: update too, or your code will be 
-				#NOTE: pointelessly compromised
+		#NOTE: there is no sense in reinventing Rodrigues' rotation
+			#NOTE: trick, so I will simply implement the rotation
+			#NOTE: in mdanalyis and redefine atom
+			#NOTE: positions accordingly
+			#NOTE: you will need to update the atoms
+			#NOTE: attribute to check if this rotation has
+			#NOTE: been performed, also, print a warning
+			#NOTE: so you don't find yourself doing this with
+			#NOTE: trajectory data
+			#NOTE: be careful to ensure the residues handle the
+			#NOTE: update too, or your code will be 
+			#NOTE: pointelessly compromised
 
-			#TODO: add a sanity check for atom positions ☑️
-			#TODO: add a santiy check for residue positions ☑️
+		#TODO: add a sanity check for atom positions ☑️
+		#TODO: add a santiy check for residue positions ☑️
 			
-			#I'm encoding the intended rotation operations
-			if θ_x != 0:
-				d_x_bool = 1
-			else:
-				d_x_bool = 0
+		#I'm encoding the intended rotation operations
+		if θ_x != 0:
+			d_x_bool = 1
+		else:
+			d_x_bool = 0
 
-			if θ_y != 0:
-				d_y_bool = 1
-			else:
-				d_y_bool = 0
+		if θ_y != 0:
+			d_y_bool = 1
+		else:
+			d_y_bool = 0
 
-			if θ_z != 0:
-				d_z_bool = 1
-			else:
-				d_z_bool = 0
+		if θ_z != 0:
+			d_z_bool = 1
+		else:
+			d_z_bool = 0
 
 
-			proteinSelection = self.universe.select_atoms("protein")
+		proteinSelection = self.universe.select_atoms("protein")
 
-			#Executing the intended rotations here
-			if d_x_bool == 1:
-				mda.transformations.rotate(
+		#Executing the intended rotations here
+		if d_x_bool == 1:
+			mda.transformations.rotate(
 						θ_x, 
 						direction = [d_x_bool, 0, 0], 
 						ag = proteinSelection)
 
-			if d_y_bool == 1:
-				mda.transformations.rotate(
+		if d_y_bool == 1:
+			mda.transformations.rotate(
 						θ_y, 
 						direction = [0, d_y_bool, 0], 
 						ag = proteinSelection)
 
-			if d_z_bool == 1:
-				mda.transformations.rotate(
+		if d_z_bool == 1:
+			mda.transformations.rotate(
 						θ_z, 
 						direction = [0, 0, d_z_bool], 
 						ag = proteinSelection)
 
-			warnings.warn("rotation methods should not be executed for trajectory"
-					" filled universes, do not use this method"
-					"unless simply handling a PDB"
-					"if additional metadata is associated"
-					"with the object, unexepected behavior will happen")
-
-
-
-			
-
-			
-
-			
+		warnings.warn("rotation methods should not be executed for trajectory"
+				" filled universes, do not use this method"
+				"unless simply handling a PDB"
+				"if additional metadata is associated"
+				"with the object, unexepected behavior will happen")
 
 
 
@@ -656,6 +648,9 @@ class membrane:
 		plt.ylabel('position along the z axis (Å)')
 		plt.plot(τ, Z)
 		plt.show()
+
+	def defineLeafletsDebug(self):
+		print("Man I just wiish someone would love me")
 
 	def getLeaflets(self):
 		print("Just printing this to see if I have the right authorizaiton from git")
