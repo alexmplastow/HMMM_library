@@ -705,6 +705,10 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars, scseHmmmMembraneInsta
 
 	lipidColvars = []
 	ctlIndex = 0
+
+	#Adding lipid details to determine lipid subtype
+	scseHmmmMembraneInstance.labelResiduesWithLeaflets()
+
 	for lipid in scseHmmmMembraneInstance.lipids:
 
 		#I will not be adding constraints to the lipids in this implementation
@@ -723,8 +727,17 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars, scseHmmmMembraneInsta
 		templateColvar.manualAtomNumbersString = ' '.join(colvarIndices)
 		templateColvar.name = f'ctl{ctlIndex}'
 
+		#I neglected to add harmonic mods the first time and that !@#$ed my implementation
+		templateColvar.harmonic.colvarName = f'ctl{ctlIndex}'
+		
 		#Incrementing for the subsequent residue
 		ctlIndex += 1
+
+		#Checking the lipid type before adjusting the residue center
+		if lipid.leaflet == 'upper':
+			templateColvar.harmonic.centers = templateColvar.harmonic.centers
+		elif lipid.leaflet == 'lower':
+			templateColvar.harmonic.centers = -templateColvar.harmonic.centers	
 
 		#Now adding that pesky colvar
 		lipidColvars.append(templateColvar)

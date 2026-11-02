@@ -567,6 +567,21 @@ class membrane:
 
 				scopeLipid.colvarIndices = colvarIndices
 
+
+		if hasattr(self, "hasLipidLeafletLabels"):
+			
+			for lipid_i in lipids:
+			
+				if lipid_i.r[-1] < 0:
+			
+					lipid_i.leaflet = 'lower'
+			
+				elif lipid_i.r[-1] > 0:
+			
+					lipid_i.leaflet = 'upper'
+				else:
+					raise Exception("This method is broken")
+
 		return lipids
 
 	@property
@@ -578,6 +593,7 @@ class membrane:
 			R = np.vstack((R, lipid.r))
 
 		return R
+
 		
 
 	def returnMembraneAtomZ_positions(self):
@@ -650,7 +666,24 @@ class membrane:
 		plt.show()
 
 	def defineLeafletsDebug(self):
-		print("Man I just wiish someone would love me")
+		R = self.lipid_Rs
+		Z = np.array([r[-1] for r in R])
+		plt.hist(Z, bins = 60)
+		plt.xlabel("Z axis in Å")
+		plt.ylabel("n")
+		plt.show()
+	
+	#NOTE: assumes lipid heads are consistently in the same position
+
+	def labelResiduesWithLeaflets(self):
+		self.hasLipidLeafletLabels = True
+	
+	def leafletLabelSanityCheck(self):
+		for lipid in self.lipids:
+			try:
+				lipid.leaflet
+			except:
+				raise Exception("Brother, your lipid has no leaflet designation")
 
 	def getLeaflets(self):
 		print("Just printing this to see if I have the right authorizaiton from git")
