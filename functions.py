@@ -702,7 +702,7 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars,
 								DPPCname = ['C26', 'C36'],
 								restrainCholesterol = restrainCholesterol)
 
-	scseHmmmMembraneInstance.addConstraintIndicesToEachSolventResidue()
+	scseHmmmMembraneInstance.labelLipidsWithLeafletLabels()
 
 	#Now, collecting the lipids from the scseHmmmMembraneInstance
 

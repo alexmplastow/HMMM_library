@@ -686,8 +686,26 @@ class membrane:
 			except:
 				raise Exception("Brother, your lipid has no leaflet designation")
 
-	def getLeaflets(self):
-		print("Just printing this to see if I have the right authorizaiton from git")
+	#NOTE: a semi-parochial function which allows retrieval of leaflet atoms
+		#NOTE: I use this for acquiring the atoms I will use to define the
+		#NOTE: protein to membrane distance
+
+
+	#NOTE: I inspected the particles logged by this method and found they match
+		#NOTE: the lower criterion
+		#NOTE: so, sanity check passed
+	def getLeafletRepAtoms(self, leaflet = 'lower'):
+
+		self.labelLipidsWithLeafletLabels()
+
+		representativeLeafletAtoms = []
+		for lipid in self.lipids:
+			if lipid.leaflet == leaflet:
+				representativeLeafletAtoms.append(
+						int(lipid.representativeAtom.index))
+
+		return representativeLeafletAtoms
+		
 
 
 class solventResidue:
