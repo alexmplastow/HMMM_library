@@ -715,6 +715,7 @@ class hmmmMembrane(membrane):
 			solventResidue(mdaResidue) for mdaResidue in
 			self.universe.select_atoms(f"resname {self.solventResname}").residues]
 
+
 		#TODO: This is just a template, from the lipid example, it will need updating
 			#TODO: make sure it is updated when the time comes
 		#First checking if there are colvarIndices within the membrane object's memory
@@ -742,10 +743,12 @@ class hmmmMembrane(membrane):
 	#SCSE
 	#My/Muyun's implementation uses [C6S, C6F] for SSM
 		#dppc's terminal carbon is [C26, C36]
-
+	#TODO: revise this code to inspect the lipid subtype first
+		#NOTE: the lipid types are: SSM, DPPC, and CHL1
 	def addConstraintIndicesToEachLipid(self, 
 						SSMname = ['CST', 'CFT'], 
-						DPPCname = ['C2T', 'C3T']):
+						DPPCname = ['C2T', 'C3T'],
+						restrainCholesterol = False):
 
 		indexFindingBool = False
 		#NOTE: I do not like using lists in this way, but to keep 
@@ -756,16 +759,47 @@ class hmmmMembrane(membrane):
 		colvarIndicesList = []
 		#Adding the colvar indices for each lipid
 		for lipid in self.lipids:
+
 			lipid.colvarIndices = []
-			for atom in lipid.atoms:
-				if atom.name == SSMname[0] or atom.name == SSMname[-1]:
-					lipid.colvarIndices.append(atom.index)
-					indexFindingBool = True
 
-				elif atom.name == DPPCname[0] or atom.name == DPPCname[-1]:
-					lipid.colvarIndices.append(atom.index)
-					indexFindingBool = True
 
+			if lipid.lipidType == "SSM":
+
+				for atom in lipid.atoms:
+					
+					if atom.name == SSMname[0] or atom.name == SSMname[-1]:
+						
+						lipid.colvarIndices.append(atom.index)
+						indexFindingBool = True
+
+			elif lipid.lipidType == "DPPC":
+
+				for atom in lipid.atoms:
+					
+					if atom.name == DPPCname[0] or atom.name == DPPCname[-1]:
+						
+						lipid.colvarIndices.append(atom.index)
+						indexFindingBool = True
+
+			#NOTE: this block of code passed a sanity check
+				#NOTE: to verify it is executing
+
+			elif lipid.lipidType == "CHL1":
+
+				CHL1atomNames = [f"C{i}" for i in range(0,18)]
+				for atom in lipid.atoms:
+
+					if atom.name in CHL1atomNames:
+										
+						lipid.colvarIndices.append(atom.index)
+						indexFindingBool = True
+
+
+			else:
+
+				raise Exception("You have an intruder in your lipid system")			
+
+			
 			colvarIndicesList.append(lipid.colvarIndices)
 
 		self.lipidColvarIndicesList = colvarIndicesList
@@ -786,7 +820,7 @@ class hmmmMembrane(membrane):
 		
 		elif self.solventResname == 'SCSE':
 			atomNames = ['C1', 'C2']
-
+			
 		colvarIndicesList = []
 		for solventResidue in self.solventResidues:
 			

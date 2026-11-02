@@ -684,7 +684,9 @@ def checkHMMMUniverseConstraintAtomsSanityCheck(hmmmMembrane):
 	print("Example solvent colvarIndices")
 	print(exampleSolventResidueColvarIndices)
 
-def translateCharmmColvarFileToSCSEColvars(exampleColvars, scseHmmmMembraneInstance):
+def translateCharmmColvarFileToSCSEColvars(exampleColvars, 
+						scseHmmmMembraneInstance, 
+						restrainCholesterol = True):
 
 	#Collecting a type 1 colvar and 2 colvars
 	def collectColvar(typeNO, exampleColvars = exampleColvars):
@@ -697,7 +699,8 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars, scseHmmmMembraneInsta
 
 	#Adding the usefull indices to scseHmmmMembraneInstance
 	scseHmmmMembraneInstance.addConstraintIndicesToEachLipid(SSMname = ['C6S', 'C6F'],
-								DPPCname = ['C26', 'C36'])
+								DPPCname = ['C26', 'C36'],
+								restrainCholesterol = restrainCholesterol)
 
 	scseHmmmMembraneInstance.addConstraintIndicesToEachSolventResidue()
 
@@ -712,35 +715,37 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars, scseHmmmMembraneInsta
 	for lipid in scseHmmmMembraneInstance.lipids:
 
 		#I will not be adding constraints to the lipids in this implementation
-		if lipid.lipidType == 'CHL1':
+		if lipid.lipidType == 'CHL1' and not restrainCholesterol:
 			continue
 
-		#Collecting usefull meta-data
-		colvarIndices = lipid.colvarIndices
-		nameIndex = ctlIndex
+		else:
 
-		#Creating a copy of my colvar instance
-		templateColvar = copy.deepcopy(type1Colvar)
+			#Collecting usefull meta-data
+			colvarIndices = lipid.colvarIndices
+			nameIndex = ctlIndex
 
-		#I have this set to over overide the atomNumbersString attribute
-			#Not that it makes much difference other than readability
-		templateColvar.manualAtomNumbersString = ' '.join(colvarIndices)
-		templateColvar.name = f'ctl{ctlIndex}'
+			#Creating a copy of my colvar instance
+			templateColvar = copy.deepcopy(type1Colvar)
 
-		#I neglected to add harmonic mods the first time and that !@#$ed my implementation
-		templateColvar.harmonic.colvarName = f'ctl{ctlIndex}'
+			#I have this set to over overide the atomNumbersString attribute
+				#Not that it makes much difference other than readability
+			templateColvar.manualAtomNumbersString = ' '.join(colvarIndices)
+			templateColvar.name = f'ctl{ctlIndex}'
+
+			#I neglected to add harmonic mods the first time and that !@#$ed my implementation
+			templateColvar.harmonic.colvarName = f'ctl{ctlIndex}'
 		
-		#Incrementing for the subsequent residue
-		ctlIndex += 1
+			#Incrementing for the subsequent residue
+			ctlIndex += 1
 
-		#Checking the lipid type before adjusting the residue center
-		if lipid.leaflet == 'upper':
-			templateColvar.harmonic.centers = templateColvar.harmonic.centers
-		elif lipid.leaflet == 'lower':
-			templateColvar.harmonic.centers = -templateColvar.harmonic.centers	
+			#Checking the lipid type before adjusting the residue center
+			if lipid.leaflet == 'upper':
+				templateColvar.harmonic.centers = templateColvar.harmonic.centers
+			elif lipid.leaflet == 'lower':
+				templateColvar.harmonic.centers = -templateColvar.harmonic.centers	
 
-		#Now adding that pesky colvar
-		lipidColvars.append(templateColvar)
+			#Now adding that pesky colvar
+			lipidColvars.append(templateColvar)
 
 	#Now for the solvent
 	hmmmSolventColvars = []
