@@ -79,7 +79,8 @@ class atom:
 		self.name = MDAatom.name
 		#Some sick bastard thought it was funny to start from 0
 			#Even though standard PDBs don't follow this rule
-		self.index = str(MDAatom.index)
+		#So I updated the routines to add 1 to every atomInstance.index
+		self.index = str(MDAatom.index + 1)
 
 	@property
 	def r(self):
@@ -675,7 +676,7 @@ class membrane:
 	
 	#NOTE: assumes lipid heads are consistently in the same position
 
-	def labelResiduesWithLeaflets(self):
+	def labelLipidsWithLeafletLabels(self):
 		self.hasLipidLeafletLabels = True
 	
 	def leafletLabelSanityCheck(self):
