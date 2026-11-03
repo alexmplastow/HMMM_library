@@ -694,7 +694,7 @@ class membrane:
 	#NOTE: I inspected the particles logged by this method and found they match
 		#NOTE: the lower criterion
 		#NOTE: so, sanity check passed
-	def getLeafletRepAtoms(self, leaflet = 'lower'):
+	def getLeafletRepAtoms(self, leaflet = 'lower', samplingStride = None):
 
 		self.labelLipidsWithLeafletLabels()
 
@@ -703,6 +703,14 @@ class membrane:
 			if lipid.leaflet == leaflet:
 				representativeLeafletAtoms.append(
 						int(lipid.representativeAtom.index))
+
+
+		if samplingStride != None:
+
+			representativeLeafletAtoms = \
+				[atomIndex for i, atomIndex in 
+				enumerate(representativeLeafletAtoms) 
+				if i%samplingStride == 0]
 
 		return representativeLeafletAtoms
 		
