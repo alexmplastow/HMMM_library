@@ -710,7 +710,7 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars,
 	ctlIndex = 0
 
 	#Adding lipid details to determine lipid subtype
-	scseHmmmMembraneInstance.labelResiduesWithLeaflets()
+	scseHmmmMembraneInstance.labelLipidsWithLeafletLabels()
 
 	for lipid in scseHmmmMembraneInstance.lipids:
 
@@ -747,6 +747,9 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars,
 			#Now adding that pesky colvar
 			lipidColvars.append(templateColvar)
 
+	#Adding constraint indices to the solvent
+	scseHmmmMembraneInstance.addConstraintIndicesToEachSolventResidue()
+
 	#Now for the solvent
 	hmmmSolventColvars = []
 	for solventResidue in scseHmmmMembraneInstance.solventResidues:
@@ -771,4 +774,6 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars,
 
 
 
-
+def generateProteinMembraneInteractionColvar(proteinInstance, membraneInstance):
+	
+	

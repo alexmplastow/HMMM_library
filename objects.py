@@ -439,8 +439,44 @@ class protein:
 				"if additional metadata is associated"
 				"with the object, unexepected behavior will happen")
 
+	def writePDB(self, savePath):
 
+                selection = self.universe.select_atoms("all")
+                selection.write(savePath)
 
+        	#The residues of interest are R552, W603, and R 647 are most
+                	#Certainly the residues of interest
+
+	def getVacAresiduesOfInterestCentroid(self):
+
+		#BOOKMARK
+
+		#NOTE: I did a sanity check, I have, in fact collected the arginine residue 
+ 			#NOTE: at residue R552
+		R552 = [residue for residue in self.residues
+			if residue.resnum == 552 and
+			residue.aminoAcidLetter == 'R'][0]
+
+		W603 = [residue for residue in self.residues
+			if residue.resnum == 603 and
+			residue.aminoAcidLetter == 'W'][0]
+
+		R648 = [residue for residue in self.residues
+			if residue.resnum == 647 and
+			residue.aminoAcidLetter == 'R'][0]
+
+		R552atoms = R552.atoms
+		W603atoms = W603.atoms
+		R648atoms = R648.atoms
+
+		atoms = R552atoms + W603atoms + R648atoms
+
+		R = np.array([atom.position for atom in atoms])
+
+		#I can retrieve the centroid handily with np.mean
+
+		#BOOKMARK
+		return np.mean(R, axis = 0)
 
 #NOTE: the lipid subtypes are DPPC, SSM, CHL1, avoid DCLE
 	#NOTE: use the phosphate groups in the DPPC and SSMD and the 03 in the CHL1
