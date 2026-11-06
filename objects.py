@@ -109,7 +109,7 @@ class residue:
 
 	@property
 	def atoms(self):
-		return self.universeResidue.atoms
+		return [atom(atom_i) for atom_i in self.universeResidue.atoms]
 
 	@property
 	def heavyAtoms(self):
@@ -453,6 +453,19 @@ class protein:
 
 		#NOTE: I did a sanity check, I have, in fact collected the arginine residue 
  			#NOTE: at residue R552
+		
+		atoms = self.getAtomsFromResiduesOfInterest()
+
+		R = np.array([atom.position for atom in atoms])
+
+		#I can retrieve the centroid handily with np.mean
+
+		#BOOKMARK
+		return np.mean(R, axis = 0)
+
+	#NOTE: highly parochial function
+	def getAtomsFromResiduesOfInterest(self):
+
 		R552 = [residue for residue in self.residues
 			if residue.resnum == 552 and
 			residue.aminoAcidLetter == 'R'][0]
@@ -471,12 +484,10 @@ class protein:
 
 		atoms = R552atoms + W603atoms + R648atoms
 
-		R = np.array([atom.position for atom in atoms])
+		return atoms
 
-		#I can retrieve the centroid handily with np.mean
-
-		#BOOKMARK
-		return np.mean(R, axis = 0)
+	def getAtomIndicesFromResiduesOfInterest(self):
+		return [int(atom.index) for atom in self.getAtomsFromResiduesOfInterest()]
 
 #NOTE: the lipid subtypes are DPPC, SSM, CHL1, avoid DCLE
 	#NOTE: use the phosphate groups in the DPPC and SSMD and the 03 in the CHL1
@@ -485,30 +496,32 @@ class lipid:
 	def __init__(self, universeLipidAtoms):
 		self.universeLipidAtoms = universeLipidAtoms
 
-		for atom in universeLipidAtoms:
+		for mdaAtom in universeLipidAtoms:
+
+			myAtom = atom(mdaAtom)
 			
-			if atom.resname == "CHL1" and atom.name == "O3":
+			if myAtom.resname == "CHL1" and myAtom.name == "O3":
 				
-				self.representativeAtom = atom
-				self.lipidType = atom.resname
+				self.representativeAtom = myAtom
+				self.lipidType = myAtom.resname
 				break
 			
-			if atom.resname == "SSM" and atom.name == "P":
+			if myAtom.resname == "SSM" and myAtom.name == "P":
 			
-				self.representativeAtom = atom
-				self.lipidType = atom.resname
+				self.representativeAtom = myAtom
+				self.lipidType = myAtom.resname
 				break
 			
-			if atom.resname == "DPPC" and atom.name == "P":
+			if myAtom.resname == "DPPC" and myAtom.name == "P":
 				
-				self.representativeAtom = atom
-				self.lipidType = atom.resname
+				self.representativeAtom = myAtom
+				self.lipidType = myAtom.resname
 				break
 
-			if atom.resname == "PSM" and atom.name == "P":
+			if myAtom.resname == "PSM" and myAtom.name == "P":
 				
-				self.representativeAtom = atom
-				self.lipidType = atom.resname
+				self.representativeAtom = myAtom
+				self.lipidType = myAtom.resname
 				break
 
 	@property
@@ -517,7 +530,7 @@ class lipid:
 
 	@property
 	def r(self):
-		return self.representativeAtom.position
+		return self.representativeAtom.r
 
 	
 
@@ -738,7 +751,7 @@ class membrane:
 		for lipid in self.lipids:
 			if lipid.leaflet == leaflet:
 				representativeLeafletAtoms.append(
-						int(lipid.representativeAtom.index))
+						(lipid.representativeAtom))
 
 
 		if samplingStride != None:
@@ -749,6 +762,12 @@ class membrane:
 				if i%samplingStride == 0]
 
 		return representativeLeafletAtoms
+
+
+	def getLeafletRepAtomIndices(self, samplingStride = None):
+
+		return [int(atom.index) for atom in 
+			self.getLeafletRepAtoms(samplingStride = samplingStride)]
 		
 
 
@@ -964,6 +983,7 @@ class colvar:
 
 	def addHarmonic(self, harmonic):
 		self.harmonic = harmonic
+
 	
 	#NOTE: There are two types of colvars included in the *col file
 		#NOTE: this determines which kind I have loaded
@@ -1063,6 +1083,30 @@ class colvar:
 			)
 
 			return blockString
+
+		elif self.type == 3:
+
+			blackString = (
+				f"colvar {{\n"
+                		f"    name {self.name}\n"
+                		f"\n"
+                		f"    distanceZ {{\n"
+                		f"        main {{\n"
+                		f"            atomNumbers {self.mainAtomNumbersString}"
+                		f"        }}\n"
+                		f"        ref {{\n"
+                		f"            atomNumbers {self.referenceAtomNumbersString}\n"
+                		f"        }}\n"
+                		f"    }}\n"
+                		f"}}\n"
+                		f"\n"
+                		f"harmonicWalls {{\n"
+                		f"    name protein_membrane_Z_upper_wall\n"
+                		f"    colvars {self.name}\n"
+                		f"    upperWalls {self.upperwallDistance}\n"
+                		f"    forceConstant {self.harmonic.forceConstant}\n"
+                		f"}}\n"
+			)
 
 		else:
 			raise Exception("Alex WTF!?")

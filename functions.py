@@ -368,8 +368,17 @@ def block_is_value_list(tokens, start):
 	end = find_matching_brace(tokens, start - 1)
 	inner = [t for t in tokens[start:end] if t != "\n"]
 
-	return inner and "{" not in inner and "}" not in inner
+	if not inner:
+		return False
 
+	if "{" in inner or "}" in inner:
+		return False
+
+	if inner[0] in ("atomNumbers", "atomNumbersRange"):
+		return False
+
+	return True
+	
 #Author: chatGPT
 def parse_block(tokens, index):
 	result = {}
@@ -420,6 +429,10 @@ def parse_block(tokens, index):
 #Author: chatGPT
 def parse_colvars_file(text):
 	tokens = tokenize_colvars(text)
+
+	print(text)
+	print("////////////////")
+
 	parsed = {}
 	index = 0
 
@@ -443,8 +456,8 @@ def parse_colvars_file(text):
 		if block_type == "colvar" and "name" in block:
 			parsed.setdefault("colvar", {})[block["name"]] = block
 
-		elif block_type == "harmonic" and "colvars" in block:
-			parsed.setdefault("harmonic", {})[block["colvars"]] = block
+		elif block_type in ("harmonic", "harmonicWalls") and "colvars" in block:
+			parsed.setdefault(block_type, {})[block["colvars"]] = block
 
 		else:
 			parsed.setdefault(block_type, []).append(block)
@@ -491,8 +504,7 @@ def col2Colvar(colvarFile, debug1 = False, debug2 = False):
 	harmonicDict = CH_dict['harmonic']
 	for harmonicDictKey in harmonicDict.keys():
 		harmonicInstances.append(objects.harmonic(harmonicDict[harmonicDictKey]))
-
-
+	
 	for colvarInstance in colvarInstances:
 		for harmonicInstance in harmonicInstances:
 			if colvarInstance.name == harmonicInstance.colvarName:
@@ -774,6 +786,75 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars,
 
 
 
-def generateProteinMembraneInteractionColvar(proteinInstance, membraneInstance):
+def generateProteinMembraneInteractionColvar(proteinInstance, 
+						membraneInstance,
+						membraneLipidSamplingStride = 1):
+	residueOfInterestIndices = proteinInstance.getAtomIndicesFromResiduesOfInterest()
+	leafletRepAtomIndices = \
+		membraneInstance.getLeafletRepAtomIndices(samplingStride = membraneLipidSamplingStride)
+
+	residuesOfInterestIndices_string = " ".join([str(i) for i in residueOfInterestIndices])
+	leafletRepAtoms_string = " ".join([str(i) for i in leafletRepAtomIndices])
+
+	#NOTE: I need to check the distance between the membrane and the protein and
+		#NOTE: enforce that
+
+	proteinInstanceResidueOfInterestAtoms = proteinInstance.getAtomsFromResiduesOfInterest()
+	membraneInstanceResiduesOfInterestAtoms = membraneInstance.getLeafletRepAtoms()
+
+	def getAtomGeometricCenter(atoms):
+		N = len(atoms)
+		Σ = sum(np.array([atom.r for atom in atoms]))
+		return Σ/N
+
+	proteinResiduesOfInterestGeometricCenter = getAtomGeometricCenter(
+						proteinInstanceResidueOfInterestAtoms)
+	membraneInstanceResiduesOfInterestGeometricCenter = getAtomGeometricCenter(
+						membraneInstanceResiduesOfInterestAtoms)
+
+	Zdistance = abs(membraneInstanceResiduesOfInterestGeometricCenter[-1]
+			- proteinResiduesOfInterestGeometricCenter[-1])
+
+	proteinMembraneColvar = (
+		f"colvar {{\n"
+		f"    name protein_membrane_Z\n"
+		f"\n"
+		f"    distanceZ {{\n"
+		f"        main {{\n"
+		f"            atomNumbers {residuesOfInterestIndices_string}\n"
+		f"        }}\n"
+		f"        ref {{\n"
+		f"            atomNumbers {leafletRepAtoms_string}\n"
+		f"        }}\n"
+		f"    }}\n"
+		f"}}\n"
+		f"\n"
+		f"harmonicWalls {{\n"
+		f"    name protein_membrane_Z_upper_wall\n"
+		f"    colvars protein_membrane_Z\n"
+		f"    upperWalls {Zdistance}\n"
+		f"    forceConstant 5.0\n"
+		f"}}\n"
+	)
 	
+	#NOTE: don't ever use chatGPT to handle parsing again
+	CH_dict = parse_colvars_file(proteinMembraneColvar)
+	colvarDict = CH_dict['colvar']
+
 	
+	#print(colvarDict)
+	#raise Exception("Stop here")
+	colvarName = list(colvarDict.keys())[0]
+	colvar = objects.colvar(colvarDict[colvarName])
+
+	print(CH_dict)
+	print(CH_dict.keys())
+	print("harmonicWall Dict")
+	print(CH_dict['harmonicWalls']['protein_membrane_Z'].keys())
+	print("colvarDict")
+	print(CH_dict['colvar'].keys())
+
+	raise Exception("Stop here")
+
+	return colvar
+
