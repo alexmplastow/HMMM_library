@@ -1065,7 +1065,23 @@ class colvar:
 				" ".join(str(atomNumber) for atomNumber in self.distanceZInstance.atomNumbers)
 				)
 
+		if self.colvarType == 3:
+			atomNumbersString = None
+
 		return atomNumbersString
+
+	@property
+	def mainAtomNumbersString(self):
+		atomNumbersAsStrings = [str(i) for i in self.mainAtomNumbers]
+		atomNumbersString = ' '.join(atomNumbersAsStrings)
+		return self.atomNumbersString
+
+	@property
+	def referenceAtomNumberString(self):
+		atomNumbersAsStrings = [str(i) for i in self.referenceAtomNumbers]
+		atomNumbersString = ' '.join(atomNumbersAsStrings)
+		return self.atomNumbersString		
+
 
 	def constructBlock(self):
 
