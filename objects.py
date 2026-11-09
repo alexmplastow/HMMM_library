@@ -1074,13 +1074,13 @@ class colvar:
 	def mainAtomNumbersString(self):
 		atomNumbersAsStrings = [str(i) for i in self.mainAtomNumbers]
 		atomNumbersString = ' '.join(atomNumbersAsStrings)
-		return self.atomNumbersString
+		return atomNumbersString
 
 	@property
-	def referenceAtomNumberString(self):
+	def referenceAtomNumbersString(self):
 		atomNumbersAsStrings = [str(i) for i in self.referenceAtomNumbers]
 		atomNumbersString = ' '.join(atomNumbersAsStrings)
-		return self.atomNumbersString		
+		return atomNumbersString		
 
 
 	def constructBlock(self):
@@ -1129,7 +1129,7 @@ class colvar:
 
 		elif self.type == 3:
 
-			blackString = (
+			blockString = (
 				f"colvar {{\n"
                 		f"    name {self.name}\n"
                 		f"\n"
@@ -1144,12 +1144,13 @@ class colvar:
                 		f"}}\n"
                 		f"\n"
                 		f"harmonicWalls {{\n"
-                		f"    name {self.name}\n"
-                		f"    colvars {self.colvarName}\n"
-                		f"    upperWalls {self.upperwallDistance}\n"
-                		f"    forceConstant {self.harmonic.forceConstant}\n"
+                		f"    name {self.harmonicWalls.name}\n"
+                		f"    colvars {self.harmonicWalls.colvarName}\n"
+                		f"    upperWalls {self.harmonicWalls.upperWallDistance}\n"
+                		f"    forceConstant {self.harmonicWalls.forceConstant}\n"
                 		f"}}\n"
 			)
+			return blockString
 
 		else:
 			raise Exception("Alex WTF!?")
@@ -1169,8 +1170,8 @@ class harmonicWalls:
 	def __init__(self,harmonicWallsDict):
 		key1 = list(harmonicWallsDict.keys())[0]
 		self.name = harmonicWallsDict[key1]['name']
-		self.colvarsName = harmonicWallsDict[key1]['colvars']
-		self.upperWalls = harmonicWallsDict[key1]['upperWalls']
+		self.colvarName = harmonicWallsDict[key1]['colvars']
+		self.upperWallDistance = harmonicWallsDict[key1]['upperWalls']
 		self.forceConstant = harmonicWallsDict[key1]['forceConstant']
 
 #NOTE: this class is courtesy of chatGPT..... and a complete pain in my butt
