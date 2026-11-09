@@ -981,24 +981,51 @@ class colvar:
 		except:
 			pass
 
+		#Added for the harmonicWalls implementation
+		#NOTE: this is probably fine for now, but will need revision later
+		try:
+			self.name = blockDict['protein_membrane_Z']['name']
+
+		except:
+			pass
+
+		try:
+			self.mainAtomNumbers = blockDict['protein_membrane_Z']['distanceZ']['main']['atomNumbers']
+
+		except:
+			pass
+
+		try:
+			self.referenceAtomNumbers = \
+				blockDict['protein_membrane_Z']['distanceZ']['ref']['atomNumbers']
+		except:
+			pass
+
 	def addHarmonic(self, harmonic):
 		self.harmonic = harmonic
+
+	def addHarmonicWalls(self, harmonicWalls):
+		self.harmonicWalls = harmonicWalls
 
 	
 	#NOTE: There are two types of colvars included in the *col file
 		#NOTE: this determines which kind I have loaded
 	def determineType(self):
-		try:
-			self.upperWall
-			self.upperBoundary
-			self.upperwallconstant
-			self.lowerWall
-			self.lowerBoundary
-			self.lowerwallconstant
-			
+		
+		if hasattr(self, "upperWall") and \
+			hasattr(self, "upperBoundary") and \
+			hasattr(self, "upperwallconstant") and \
+			hasattr(self, "lowerWall") and \
+			hasattr(self, "lowerBoundary") and \
+			hasattr(self, "lowerwallconstant"):
+
 			self.type = 2
 
-		except:
+		elif hasattr(self, "referenceAtomNumbers"):
+
+			self.type = 3
+
+		else:
 
 			self.type = 1
 
@@ -1101,8 +1128,8 @@ class colvar:
                 		f"}}\n"
                 		f"\n"
                 		f"harmonicWalls {{\n"
-                		f"    name protein_membrane_Z_upper_wall\n"
-                		f"    colvars {self.name}\n"
+                		f"    name {self.name}\n"
+                		f"    colvars {self.colvarName}\n"
                 		f"    upperWalls {self.upperwallDistance}\n"
                 		f"    forceConstant {self.harmonic.forceConstant}\n"
                 		f"}}\n"
@@ -1121,6 +1148,14 @@ class harmonic:
 		self.colvarName = harmonicDict['colvars']
 		self.centers = harmonicDict['centers']
 		self.forceConstant = harmonicDict['forceConstant']
+
+class harmonicWalls:
+	def __init__(self,harmonicWallsDict):
+		key1 = list(harmonicWallsDict.keys())[0]
+		self.name = harmonicWallsDict[key1]['name']
+		self.colvarsName = harmonicWallsDict[key1]['colvars']
+		self.upperWalls = harmonicWallsDict[key1]['upperWalls']
+		self.forceConstant = harmonicWallsDict[key1]['forceConstant']
 
 #NOTE: this class is courtesy of chatGPT..... and a complete pain in my butt
 class block:

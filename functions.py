@@ -430,9 +430,6 @@ def parse_block(tokens, index):
 def parse_colvars_file(text):
 	tokens = tokenize_colvars(text)
 
-	print(text)
-	print("////////////////")
-
 	parsed = {}
 	index = 0
 
@@ -700,7 +697,7 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars,
 						scseHmmmMembraneInstance, 
 						restrainCholesterol = True):
 
-	#Collecting a type 1 colvar and 2 colvars
+	#Collecting a type 1 colvar, type 2 colvars, and type3 colvars
 	def collectColvar(typeNO, exampleColvars = exampleColvars):
 		for exampleColvar in exampleColvars:
 			if exampleColvar.colvarType == typeNO:
@@ -708,7 +705,7 @@ def translateCharmmColvarFileToSCSEColvars(exampleColvars,
 
 	type1Colvar = collectColvar(typeNO = 1)
 	type2Colvar = collectColvar(typeNO = 2)
-
+	
 	#Adding the usefull indices to scseHmmmMembraneInstance
 	scseHmmmMembraneInstance.addConstraintIndicesToEachLipid(SSMname = ['C6S', 'C6F'],
 								DPPCname = ['C26', 'C36'],
@@ -840,21 +837,12 @@ def generateProteinMembraneInteractionColvar(proteinInstance,
 	#NOTE: don't ever use chatGPT to handle parsing again
 	CH_dict = parse_colvars_file(proteinMembraneColvar)
 	colvarDict = CH_dict['colvar']
+	harmonicWallsDict = CH_dict['harmonicWalls']
 
-	
-	#print(colvarDict)
-	#raise Exception("Stop here")
-	colvarName = list(colvarDict.keys())[0]
-	colvar = objects.colvar(colvarDict[colvarName])
+	colvar = objects.colvar(colvarDict)
+	harmonicWalls = objects.harmonicWalls(harmonicWallsDict)
 
-	print(CH_dict)
-	print(CH_dict.keys())
-	print("harmonicWall Dict")
-	print(CH_dict['harmonicWalls']['protein_membrane_Z'].keys())
-	print("colvarDict")
-	print(CH_dict['colvar'].keys())
-
-	raise Exception("Stop here")
+	colvar.addHarmonicWalls(harmonicWalls)
 
 	return colvar
 
