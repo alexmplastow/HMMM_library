@@ -3,9 +3,17 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import MDAnalysis
+from MDAnalysis.analysis import contacts
+from MDAnalysis.lib.distances import capped_distance
+from scipy.special import expit
 import re
+import os
 import pandas as pd
 import copy
+
+from fastparquet import write
+from fastparquet import ParquetFile
+import pyarrow
 
 def getProteinCOMandLeafletZs(proteinInstance, membraneInstance):
 
@@ -846,3 +854,102 @@ def generateProteinMembraneInteractionColvar(proteinInstance,
 
 	return colvar
 
+def protein_membraneContacts(protein, membrane, frameNum):
+
+    universe = protein.universe
+    universe.trajectory[frameNum]
+
+    mdaProtein = universe.select_atoms("protein")
+    mdaMembrane = universe.select_atoms("segid MEMB")
+
+    pairs, distances = capped_distance(
+        reference=mdaProtein.positions,
+        configuration=mdaMembrane.positions,
+        max_cutoff=4.5,
+        box=universe.dimensions,
+        method="nsgrid",
+        return_distances=True,
+    )
+
+    contact_weights = expit(-5.0 * (distances - 4.5))
+
+    return {
+        "frame": universe.trajectory.ts.frame,
+        "contact_i": mdaProtein.indices[pairs[:, 0]],
+        "contact_j": mdaMembrane.indices[pairs[:, 1]],
+        "distances": distances,
+        "contact_weights": contact_weights
+    }
+
+
+def proteinMembraneContacts2Parquet(protein,
+                                        membrane,
+                                        parquetPath,
+                                        sanityCheck = True):
+
+        #I embeded the universe inside both the protein and membrane
+        universe = protein.universe
+
+        #I prefer not to grab indices from elsewhere to keep my code clean
+        trajIndices = list(range(0, len(universe.trajectory)))
+
+        #Checking for the presence of the parquet file
+        if not os.path.isfile(parquetPath):
+                print('parquet not found, writing a new one with intial frame')
+                contactsDict = protein_membraneContacts(
+                                        protein,
+                                        membrane,
+                                        0)
+
+                df = pd.DataFrame([contactsDict]).reset_index()
+
+                df.to_parquet(
+                        parquetPath,
+                        engine="pyarrow")
+
+
+        completedParquet_pf = ParquetFile(parquetPath)
+
+        completedParquet_df = completedParquet_pf.to_pandas()
+
+        completedParquetIndices = list(completedParquet_df['frame'])
+
+        for index in tqdm(trajIndices):
+
+                if index in completedParquetIndices:
+
+                        continue
+
+                else:
+
+                        contactsDict = protein_membraneContacts(
+                                        protein,
+                                        membrane,
+                                        index)
+
+                        newContactRow = pd.DataFrame([contactsDict]).reset_index()
+
+                        completedParquet_df = \
+                                pd.concat([completedParquet_df, newContactRow])
+
+                        completedParquet_df.to_parquet(
+                                parquetPath[:-5] + 'tmp.parq',
+                                                        engine="pyarrow")
+
+                        completedParquet_df.to_parquet(parquetPath,
+                                                        engine="pyarrow")
+
+
+
+        if sanityCheck:
+
+                completedParquetIndices = list(completedParquet_df['frame'])
+
+                contactLengths = []
+                for index in completedParquetIndices:
+                        contactLengths.append(
+                        len(completedParquet_df.iloc[index]['contact_i']))
+
+        #I don't currently have quibbles about checking the parquet each
+                #time I iterate through an index
+        #for traj_i in trajIndices:
