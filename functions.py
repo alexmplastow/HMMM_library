@@ -953,3 +953,25 @@ def proteinMembraneContacts2Parquet(protein,
         #I don't currently have quibbles about checking the parquet each
                 #time I iterate through an index
         #for traj_i in trajIndices:
+
+def getSetOfObserved_atom_atomContactsFromParquet(parquetPath):
+
+
+        completedParquet_pf = ParquetFile(parquetPath)
+
+        completedParquet_df = completedParquet_pf.to_pandas()
+
+        observedContacts = set()
+        for row in tqdm(completedParquet_df.itertuples()):
+
+                iContacts = row.contact_i
+                jContacts = row.contact_j
+
+                for i, j in zip(iContacts, jContacts):
+                        observedContacts.add(str(i) + '_' + str(j))
+
+        return observedContacts
+
+def getSetOfMacro_atom_atomContactsFromParquet(parquetPath, pdb):
+
+	observedContacts
