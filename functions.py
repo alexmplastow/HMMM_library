@@ -854,13 +854,15 @@ def generateProteinMembraneInteractionColvar(proteinInstance,
 
 	return colvar
 
-def protein_membraneContacts(protein, membrane, frameNum):
+def protein_membraneContacts(protein, membrane, frameNum, 
+			proteinSelection = "protein and not name H*",
+			membraneSelection = "segid MEMB and not name H*"):
 
     universe = protein.universe
     universe.trajectory[frameNum]
 
-    mdaProtein = universe.select_atoms("protein")
-    mdaMembrane = universe.select_atoms("segid MEMB")
+    mdaProtein = universe.select_atoms(proteinSelection)
+    mdaMembrane = universe.select_atoms(membraneSelection)
 
     pairs, distances = capped_distance(
         reference=mdaProtein.positions,
@@ -885,6 +887,8 @@ def protein_membraneContacts(protein, membrane, frameNum):
 def proteinMembraneContacts2Parquet(protein,
                                         membrane,
                                         parquetPath,
+					proteinSelection = "protein",
+					membraneSelection = "segid MEMB",
                                         sanityCheck = True):
 
         #I embeded the universe inside both the protein and membrane
@@ -972,6 +976,117 @@ def getSetOfObserved_atom_atomContactsFromParquet(parquetPath):
 
         return observedContacts
 
-def getSetOfMacro_atom_atomContactsFromParquet(parquetPath, pdb):
 
-	observedContacts
+def getSetOfMacro_atom_atomContactsFromParquet(parquetPath, pdbPath):
+
+        #Getting contact data
+        contactParquet_pf = ParquetFile(parquetPath)
+
+        #Collecting protein identifiers
+        pdbUniverse = MDAnalysis.Universe(pdbPath)
+        pdbProtein = objects.protein(pdbUniverse)
+        pdbMembrane = objects.membrane(pdbUniverse)
+
+        #Collecting the respective atom domains
+        proteinDomain = pdbProtein.getAtomDomain()
+        membraneDomain = pdbMembrane.getAtomDomain()
+
+        #Collecting the set of observedContacts
+        observedContacts = getSetOfObserved_atom_atomContactsFromParquet(parquetPath)
+
+        proteinDomain = set(proteinDomain)
+        membraneDomain = set(membraneDomain)
+        labelsByIndex = {}
+
+        def getAtomLabel(index):
+                if index in labelsByIndex:
+                        return labelsByIndex[index]
+
+                if index in proteinDomain:
+                        atom = pdbProtein.returnAtomFromIndex(index)
+                        label = f"{atom.resname}_{atom.resID}_{atom.name}"
+                elif index in membraneDomain:
+                        atom = pdbMembrane.returnAtomFromIndex(index)
+                        label = f"{atom.resname}_{atom.name}"
+                else:
+                        raise ValueError(f"Atom index {index} is outside the protein–membrane domain")
+
+                labelsByIndex[index] = label
+                return label
+
+        macroContacts = set()
+        for contact in tqdm(observedContacts):
+                i, j = map(int, contact.split("_", 1))
+                macroContacts.add(f"{getAtomLabel(i)}&{getAtomLabel(j)}")
+                print(f"{getAtomLabel(i)}&{getAtomLabel(j)}")
+
+        return macroContacts
+
+def getSumOfObservedContacts(protein, membrane, parquetPath):
+
+        proteinMembraneContacts2Parquet(protein,
+                                        membrane,
+                                        parquetPath,
+                                        sanityCheck = False)
+
+        completedParquet_pf = ParquetFile(parquetPath)
+
+        completedParquet_df = completedParquet_pf.to_pandas()
+
+        frames = completedParquet_df['frame']
+        contactWeights = completedParquet_df['contact_weights']
+
+        contactSummations = np.array([])
+
+        for frame, weights in zip(frames, contactWeights):
+
+                contactSummations = np.append(contactSummations,
+                                        sum(np.array(weights)))
+        t = np.array(frames) * 0.2
+        return t, contactSummations
+
+
+#This harvests data per the method used by Hasdemir et al 2024
+def getProteinMembraneDataForUMAP(protein, membrane):
+	
+	#Getting protein residue positions
+	proteinResiduePositions = np.array([residue.r for residue 
+						in protein.residues])
+	#Getting lipid positions
+	lipidPositions = np.array([lipid.r for lipid in membrane.lipids])
+	
+	#Collecting the phosphate plane COM so I can guesstimate the
+		#Position of the z
+	phosphatePlane_COM = np.mean(lipidPositions)
+
+	#Checking the difference between the protein residue positions and
+		#that center of mass with the intention of recuperating the 
+		#Δd_z
+
+	pmΔd = proteinResiduePositions - phosphatePlane_COM
+
+	#Collecting the Δd
+	pmΔd_z = [r[-1] for r in pmΔd]
+
+	return pmΔd_z
+
+def getALLproteinMembraneDataForUMAP(protein, membrane, outputCSV='Δd_z.csv'):
+
+	frames = protein.getTrajectoryIndices()
+
+	#Collecting ostensible column names
+	columnNames = [f"{residue.aminoAcidLetter}_{residue.resID}" 
+		for residue in protein.residues]
+	
+	rows = []
+	for frame in tqdm(frames):
+		protein.goto(frame)
+		rows.append(getProteinMembraneDataForUMAP(protein, membrane))
+		
+	df = pd.DataFrame(rows, columns=columnNames)
+	df.to_csv(outputCSV)
+
+	
+
+	
+	

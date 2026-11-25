@@ -115,6 +115,7 @@ class residue:
 	def heavyAtoms(self):
 		heavyAtoms = [atom for atom in self.universeResidue.atoms if atom.name[0] != 'H']
 		return heavyAtoms
+
 		
 class protein:
 
@@ -464,7 +465,7 @@ class protein:
 		return np.mean(R, axis = 0)
 
 	#NOTE: highly parochial function
-	def getAtomsFromResiduesOfInterest(self):
+	def getAtomsFromResiduesOfInterest(self, getResiduesInstead = False):
 
 		R552 = [residue for residue in self.residues
 			if residue.resnum == 552 and
@@ -489,8 +490,50 @@ class protein:
 	def getAtomIndicesFromResiduesOfInterest(self):
 		return [int(atom.index) for atom in self.getAtomsFromResiduesOfInterest()]
 
+	def getAtomDomain(self):
+
+                atomIndices = sorted([int(atom.index) for atom in self.atoms])
+
+                return atomIndices
+
+        def returnAtomFromIndex(self, index):
+                atomIndices = self.getAtomDomain()
+                return self.atoms[index - 1 -atomIndices[0]]
+
+
 #NOTE: the lipid subtypes are DPPC, SSM, CHL1, avoid DCLE
 	#NOTE: use the phosphate groups in the DPPC and SSMD and the 03 in the CHL1
+	#NOTE: a bit of a misnomer, I get the angles, not the axes, by default
+	def getPrincipal_axes(self, asAngle = True):
+		mdaAtoms = self.universe.select_atoms("protein")
+		a1, a2, a3 = mdaAtoms.principal_axes()
+		
+		if not asAngle:
+			return a1, a2, a3
+		else:
+			simAxis = [0, 0, -1]
+			cosine = lambda u,v: (np.degrees(np.dot(u, v)/
+					(np.linalg.norm(u) * 
+					np.linalg.norm(v))))
+
+			return (cosine(a1, simAxis), 
+				cosine(a2, simAxis),
+				cosine(a3, simAxis))
+
+	def getAllPrincipalAngles(self):
+		indices = self.getTrajectoryIndices()
+
+		axisAngles = []
+		for i in tqdm(indices):
+			self.goto(i)
+			angles = self.getPrincipal_axes()
+			axisAngles.append(angles)
+
+		df = pd.DataFrame(axisAngles, columns = ['θ1', 'θ2', 'θ3'])
+
+		return df
+			
+		
 
 class lipid:
 	def __init__(self, universeLipidAtoms):
@@ -768,6 +811,15 @@ class membrane:
 
 		return [int(atom.index) for atom in 
 			self.getLeafletRepAtoms(samplingStride = samplingStride)]
+
+	def getAtomDomain(self):
+
+                atomIndices = sorted([int(atom.index) for atom in self.atoms])
+                return atomIndices
+
+        def returnAtomFromIndex(self, index):
+                atomIndices = self.getAtomDomain()
+                return self.atoms[index - 1 -atomIndices[0]]
 		
 
 
